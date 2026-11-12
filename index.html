@@ -4,7 +4,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Neon Rush V4</title>
+<title>Neon Rush V5</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#080b18;color:white;font-family:Arial,sans-serif;text-align:center}
@@ -12,6 +15,7 @@ h1{color:#00eaff;letter-spacing:5px;text-shadow:0 0 18px #00eaff}
 button{padding:12px 20px;margin:5px;border:0;border-radius:9px;background:#00d9ff;color:#07111d;font-weight:bold;cursor:pointer}
 button:disabled{opacity:.4;cursor:not-allowed}
 button:hover{filter:brightness(1.2)}
+input{padding:11px;border-radius:8px;border:1px solid #00eaff;background:#080b18;color:white;max-width:220px}
 .stats{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin:12px}
 canvas{width:min(94vw,720px);height:auto;aspect-ratio:3/2;background:#10172c;border:2px solid #00eaff;border-radius:12px;touch-action:none}
 .panel{max-width:720px;margin:12px auto;padding:16px;border:1px solid #00eaff;border-radius:14px;background:#10172c}
@@ -24,12 +28,16 @@ canvas{width:min(94vw,720px);height:auto;aspect-ratio:3/2;background:#10172c;bor
 p{color:#aab8d3;font-size:13px}
 [hidden]{display:none!important}
 #hud{max-width:720px;margin:8px auto;color:#d8e5ff;font-size:14px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+#leaderboardList{padding:0;list-style:none;text-align:left;max-width:420px;margin:15px auto}
+#leaderboardList li{padding:10px;border-bottom:1px solid #34415d;display:flex;justify-content:space-between}
+#bossText{color:#ff267e;font-weight:bold}
 </style>
 </head>
+
 <body>
 
 <h1>NEON RUSH</h1>
-<p>V4 — THE CHALLENGE UPDATE</p>
+<p>V5 — THE GLOBAL UPDATE</p>
 
 <div class="stats">
 <span>Score: <b id="score">0</b></span>
@@ -41,16 +49,20 @@ p{color:#aab8d3;font-size:13px}
 <div id="hud" hidden>
 <span id="levelLabel">LEVEL 1</span>
 <span id="missionText">Mission loading...</span>
+<span id="bossText"></span>
 </div>
 
 <canvas id="game" width="720" height="480"></canvas>
 
+<!-- MAIN MENU -->
 <div class="panel" id="menu">
 <h2>NEON RUSH</h2>
 <p>ENTER THE NEON WORLD</p>
+
 <h3>SELECT YOUR CHARACTER</h3>
 
 <div class="skins">
+
 <div class="skin">
 <div class="preview" style="background:#00eaff;color:#00eaff"></div>
 <b>CYAN</b><p>FREE</p>
@@ -68,15 +80,21 @@ p{color:#aab8d3;font-size:13px}
 <b>GOLDEN</b><p>100 COINS</p>
 <button onclick="selectSkin('gold')">UNLOCK</button>
 </div>
+
 </div>
 
 <p id="selected">Selected: CYAN</p>
+
 <button onclick="startGame()">START GAME</button>
 <button onclick="openShop()">SHOP</button>
+<button onclick="claimDailyReward()">DAILY REWARD</button>
+<button onclick="openLeaderboard()">GLOBAL LEADERBOARD</button>
+
 <p id="message"></p>
-<p>New in V4: enemies, missions and levels!</p>
+<p>V5: Boss battles, daily rewards and global leaderboard!</p>
 </div>
 
+<!-- SHOP -->
 <div class="panel" id="shop" hidden>
 <h2>⚡ NEON SHOP</h2>
 <p>Coins: <b id="shopCoins">0</b></p>
@@ -87,18 +105,90 @@ p{color:#aab8d3;font-size:13px}
 <p id="shopMessage"></p>
 </div>
 
+<!-- LEADERBOARD -->
+<div class="panel" id="leaderboard" hidden>
+<h2>🌍 GLOBAL LEADERBOARD</h2>
+<p>Compete with players around the world!</p>
+
+<p>Your player name:</p>
+<input id="playerName" maxlength="16" placeholder="Enter a name">
+
+<br>
+<button onclick="savePlayerName()">SAVE NAME</button>
+<button onclick="loadLeaderboard()">REFRESH</button>
+
+<p id="leaderStatus">Connecting to leaderboard...</p>
+
+<ol id="leaderboardList">
+<li>Loading...</li>
+</ol>
+
+<button onclick="showMenu()">BACK TO MENU</button>
+</div>
+
+<!-- GAME OVER -->
 <div class="panel" id="over" hidden>
 <h2 style="color:#ff267e">GAME OVER</h2>
 <h3>Score: <span id="finalScore">0</span></h3>
 <p id="finalMission"></p>
+<p id="uploadStatus">Submitting score...</p>
 <button onclick="startGame()">PLAY AGAIN</button>
+<button onclick="openLeaderboard()">LEADERBOARD</button>
 <button onclick="showMenu()">MAIN MENU</button>
 </div>
 
 <p>Controls: Arrow keys / A-D | Mobile: Touch and drag</p>
+<p>Boss controls: Hold SPACE to shoot | Mobile: Use the SHOOT button</p>
 <p>🟡 Coins | 🟢 Shield | 🔴 Chaser | 🟣 Zigzag | 🟠 Drifter</p>
 
+<button id="mobileShoot" hidden>SHOOT</button>
+
 <script>
+/* =====================================
+   SUPABASE CONNECTION
+===================================== */
+
+const SUPABASE_URL =
+"https://eocwuvznhduyexgofbsp.supabase.co";
+
+const SUPABASE_KEY =
+"sb_publishable_765616bw9dNOU46Z7oUDvg_m1F30cXs";
+
+const db = window.supabase.createClient(
+SUPABASE_URL,
+SUPABASE_KEY
+);
+
+let currentUser = null;
+
+async function connectAccount(){
+ try{
+  const {data,error} = await db.auth.getSession();
+
+  if(error) throw error;
+
+  if(data.session){
+   currentUser=data.session.user;
+   return true;
+  }
+
+  const result=await db.auth.signInAnonymously();
+
+  if(result.error) throw result.error;
+
+  currentUser=result.data.user;
+  return true;
+
+ }catch(error){
+  console.error("Supabase connection:",error);
+  return false;
+ }
+}
+
+/* =====================================
+   GAME DATA
+===================================== */
+
 const canvas=document.getElementById("game");
 const ctx=canvas.getContext("2d");
 const $=id=>document.getElementById(id);
@@ -107,7 +197,9 @@ function read(key,fallback){
  try{
   const v=localStorage.getItem(key);
   return v===null?fallback:JSON.parse(v);
- }catch(e){return fallback}
+ }catch(e){
+  return fallback;
+ }
 }
 
 let coins=read("nrCoins",0);
@@ -125,10 +217,24 @@ const colors={
  gold:"#ffd700"
 };
 
-let score=0,frame=0,shield=0,running=false;
-let keys={},obstacles=[],items=[],animationId=null;
-let level=1,missionIndex=read("nrMission",0);
+let score=0;
+let frame=0;
+let shield=0;
+let running=false;
+let keys={};
+
+let obstacles=[];
+let items=[];
+let bullets=[];
+let boss=null;
+
+let animationId=null;
+let level=1;
+let missionIndex=read("nrMission",0);
 let missionProgress=0;
+let lastBossLevel=0;
+let bossShootCooldown=0;
+let playerShootCooldown=0;
 
 const player={
  x:340,y:410,w:40,h:40,speed:7
@@ -180,6 +286,7 @@ function updateMenu(){
    btn.disabled=false;
   }
  });
+
  $("selected").textContent="Selected: "+selected.toUpperCase();
 }
 
@@ -191,6 +298,7 @@ function selectSkin(name){
    $("message").textContent="Not enough coins!";
    return;
   }
+
   coins-=prices[name];
   unlocked.push(name);
   $("message").textContent=name.toUpperCase()+" unlocked!";
@@ -207,10 +315,14 @@ function selectSkin(name){
 function showMenu(){
  running=false;
  cancelAnimationFrame(animationId);
+
  $("menu").hidden=false;
  $("shop").hidden=true;
  $("over").hidden=true;
  $("hud").hidden=true;
+ $("leaderboard").hidden=true;
+ $("mobileShoot").hidden=true;
+
  draw();
  updateMenu();
  updateUI();
@@ -220,6 +332,7 @@ function openShop(){
  $("menu").hidden=true;
  $("shop").hidden=false;
  $("over").hidden=true;
+ $("leaderboard").hidden=true;
  updateUI();
 }
 
@@ -243,9 +356,168 @@ $("buy").onclick=()=>{
  }
 };
 
+/* =====================================
+   DAILY REWARD
+===================================== */
+
+function claimDailyReward(){
+ const today=new Date().toLocaleDateString();
+ const lastClaim=localStorage.getItem("nrDailyClaim");
+
+ if(lastClaim===today){
+  $("message").textContent="Daily reward already claimed. Come back tomorrow!";
+  return;
+ }
+
+ coins+=50;
+ localStorage.setItem("nrDailyClaim",today);
+
+ save();
+ updateUI();
+
+ $("message").textContent="Daily reward claimed! +50 coins!";
+}
+
+/* =====================================
+   GLOBAL LEADERBOARD
+===================================== */
+
+let playerName=read("nrPlayerName","");
+
+if(!playerName){
+ playerName="Runner-"+Math.floor(1000+Math.random()*9000);
+ localStorage.setItem("nrPlayerName",JSON.stringify(playerName));
+}
+
+$("playerName").value=playerName;
+
+function savePlayerName(){
+ let name=$("playerName").value.trim();
+
+ if(name.length<1||name.length>16){
+  $("leaderStatus").textContent="Name must be 1–16 characters.";
+  return;
+ }
+
+ playerName=name;
+ localStorage.setItem("nrPlayerName",JSON.stringify(playerName));
+
+ $("leaderStatus").textContent="Player name saved!";
+}
+
+function openLeaderboard(){
+ $("menu").hidden=true;
+ $("shop").hidden=true;
+ $("over").hidden=true;
+ $("leaderboard").hidden=false;
+
+ loadLeaderboard();
+}
+
+async function loadLeaderboard(){
+ $("leaderStatus").textContent="Loading global leaderboard...";
+ $("leaderboardList").innerHTML="<li>Loading...</li>";
+
+ const connected=await connectAccount();
+
+ if(!connected){
+  $("leaderStatus").textContent="Connection failed. Check your Supabase settings.";
+  $("leaderboardList").innerHTML="";
+  return;
+ }
+
+ try{
+  const {data,error}=await db
+   .from("leaderboard")
+   .select("player_name,score")
+   .order("score",{ascending:false})
+   .limit(10);
+
+  if(error)throw error;
+
+  $("leaderboardList").innerHTML="";
+
+  if(!data||data.length===0){
+   $("leaderboardList").innerHTML="<li>No scores yet. Be the first!</li>";
+  }else{
+   data.forEach((entry,index)=>{
+    const li=document.createElement("li");
+
+    const name=document.createElement("span");
+    const points=document.createElement("b");
+
+    name.textContent=(index+1)+". "+entry.player_name;
+    points.textContent=entry.score;
+
+    li.appendChild(name);
+    li.appendChild(points);
+
+    $("leaderboardList").appendChild(li);
+   });
+  }
+
+  $("leaderStatus").textContent="Global Top 10";
+
+ }catch(error){
+  console.error(error);
+  $("leaderStatus").textContent="Could not load scores: "+error.message;
+  $("leaderboardList").innerHTML="";
+ }
+}
+
+async function submitScore(){
+ if(score<=0){
+  $("uploadStatus").textContent="No score to submit.";
+  return;
+ }
+
+ $("uploadStatus").textContent="Connecting and submitting score...";
+
+ const connected=await connectAccount();
+
+ if(!connected){
+  $("uploadStatus").textContent="Could not connect. Your local best is saved.";
+  return;
+ }
+
+ try{
+  const {data:existing,error:readError}=await db
+   .from("leaderboard")
+   .select("score")
+   .eq("user_id",currentUser.id)
+   .maybeSingle();
+
+  if(readError)throw readError;
+
+  const bestScore=Math.max(score,existing?.score||0);
+
+  const {error}=await db
+   .from("leaderboard")
+   .upsert({
+    user_id:currentUser.id,
+    player_name:playerName,
+    score:bestScore,
+    updated_at:new Date().toISOString()
+   },{onConflict:"user_id"});
+
+  if(error)throw error;
+
+  $("uploadStatus").textContent="Score submitted to the global leaderboard!";
+
+ }catch(error){
+  console.error(error);
+  $("uploadStatus").textContent="Score submission failed: "+error.message;
+ }
+}
+
+/* =====================================
+   DRAWING
+===================================== */
+
 function background(){
  ctx.fillStyle="#10172c";
  ctx.fillRect(0,0,720,480);
+
  ctx.strokeStyle="#1b2946";
 
  for(let x=0;x<720;x+=40){
@@ -286,6 +558,35 @@ function drawPlayer(){
  ctx.shadowBlur=0;
 }
 
+function drawBoss(){
+ if(!boss)return;
+
+ ctx.shadowBlur=25;
+ ctx.shadowColor="#ff267e";
+ ctx.fillStyle="#ff267e";
+ ctx.fillRect(boss.x,boss.y,boss.w,boss.h);
+
+ ctx.fillStyle="#fff";
+ ctx.fillRect(boss.x+25,boss.y+20,18,18);
+ ctx.fillRect(boss.x+boss.w-43,boss.y+20,18,18);
+
+ ctx.shadowBlur=0;
+
+ ctx.fillStyle="#333";
+ ctx.fillRect(190,15,340,15);
+
+ ctx.fillStyle="#ff267e";
+ ctx.fillRect(190,15,340*(boss.hp/boss.maxHp),15);
+
+ ctx.strokeStyle="white";
+ ctx.strokeRect(190,15,340,15);
+
+ ctx.fillStyle="white";
+ ctx.font="14px Arial";
+ ctx.textAlign="center";
+ ctx.fillText("NEON BOSS",360,48);
+}
+
 function draw(){
  background();
 
@@ -313,13 +614,29 @@ function draw(){
  });
 
  ctx.shadowBlur=0;
+
+ bullets.forEach(b=>{
+  ctx.fillStyle=b.fromBoss?"#ff267e":"#00eaff";
+  ctx.shadowBlur=12;
+  ctx.shadowColor=ctx.fillStyle;
+  ctx.fillRect(b.x,b.y,b.w,b.h);
+ });
+
+ ctx.shadowBlur=0;
+
+ drawBoss();
  drawPlayer();
 }
+
+/* =====================================
+   ENEMIES AND ITEMS
+===================================== */
 
 function addObstacle(){
  const type=["chaser","zigzag","drifter"][
   Math.floor(Math.random()*3)
  ];
+
  const w=type==="zigzag"?38:30+Math.random()*25;
 
  obstacles.push({
@@ -351,6 +668,10 @@ function hit(a,b){
         a.y+a.h>b.y;
 }
 
+/* =====================================
+   MISSIONS
+===================================== */
+
 function currentMission(){
  return missions[missionIndex];
 }
@@ -378,6 +699,7 @@ function progressMission(type,amount){
 
   save();
   updateUI();
+
   $("missionText").textContent=
    `MISSION COMPLETE! +${m.reward} COINS`;
 
@@ -391,6 +713,128 @@ function progressMission(type,amount){
  updateMissionUI();
 }
 
+/* =====================================
+   BOSS BATTLES
+===================================== */
+
+function spawnBoss(){
+ boss={
+  x:260,
+  y:65,
+  w:200,
+  h:65,
+  hp:12+level*2,
+  maxHp:12+level*2,
+  direction:1
+ };
+
+ bullets=[];
+ bossShootCooldown=0;
+
+ $("bossText").textContent="⚠ BOSS BATTLE!";
+ $("missionText").textContent="DEFEAT THE NEON BOSS!";
+}
+
+function shoot(){
+ if(!running||playerShootCooldown>0)return;
+
+ bullets.push({
+  x:player.x+18,
+  y:player.y-10,
+  w:5,
+  h:15,
+  speed:9,
+  fromBoss:false
+ });
+
+ playerShootCooldown=12;
+}
+
+function updateBoss(){
+ if(!boss)return;
+
+ boss.x+=boss.direction*(2.5+level*.1);
+
+ if(boss.x<10||boss.x+boss.w>710){
+  boss.direction*=-1;
+ }
+
+ bossShootCooldown++;
+
+ if(bossShootCooldown>=65){
+  bossShootCooldown=0;
+
+  bullets.push({
+   x:boss.x+boss.w/2,
+   y:boss.y+boss.h,
+   w:9,
+   h:16,
+   speed:4+level*.1,
+   fromBoss:true
+  });
+ }
+
+ for(let i=bullets.length-1;i>=0;i--){
+  const b=bullets[i];
+
+  if(b.fromBoss){
+   b.y+=b.speed;
+
+   if(hit(player,b)){
+    bullets.splice(i,1);
+
+    if(shield>0){
+     shield=0;
+    }else{
+     endGame();
+     return;
+    }
+   }
+
+  }else{
+   b.y-=b.speed;
+
+   if(hit(b,boss)){
+    boss.hp--;
+    bullets.splice(i,1);
+
+    if(boss.hp<=0){
+     defeatBoss();
+     return;
+    }
+   }
+  }
+ }
+
+ bullets=bullets.filter(b=>b.y>-30&&b.y<520);
+
+ $("bossText").textContent=
+  boss?"BOSS HP: "+boss.hp+"/"+boss.maxHp:"";
+}
+
+function defeatBoss(){
+ boss=null;
+ bullets=[];
+ coins+=50+level*10;
+
+ $("bossText").textContent="BOSS DEFEATED!";
+ $("missionText").textContent="BOSS DEFEATED! BONUS COINS EARNED!";
+
+ save();
+ updateUI();
+
+ setTimeout(()=>{
+  if(running){
+   $("bossText").textContent="";
+   updateMissionUI();
+  }
+ },1800);
+}
+
+/* =====================================
+   GAME LOOP
+===================================== */
+
 function gameLoop(){
  if(!running)return;
 
@@ -401,19 +845,32 @@ function gameLoop(){
 
  player.x=Math.max(0,Math.min(680,player.x));
 
+ if(keys[" "]){
+  shoot();
+ }
+
+ if(playerShootCooldown>0)playerShootCooldown--;
+
  const newLevel=1+Math.floor(score/500);
 
  if(newLevel!==level){
   level=newLevel;
   updateUI();
   updateMissionUI();
+
+  if(level%5===0&&level>lastBossLevel){
+   lastBossLevel=level;
+   spawnBoss();
+  }
  }
 
  const spawnRate=Math.max(13,42-level*3);
 
- if(frame%spawnRate===0)addObstacle();
- if(frame%78===0)addItem("coin");
- if(frame%600===0)addItem("shield");
+ if(!boss){
+  if(frame%spawnRate===0)addObstacle();
+  if(frame%78===0)addItem("coin");
+  if(frame%600===0)addItem("shield");
+ }
 
  obstacles.forEach(o=>{
   o.y+=o.speed;
@@ -474,6 +931,10 @@ function gameLoop(){
 
  if(shield>0)shield--;
 
+ updateBoss();
+
+ if(!running)return;
+
  score++;
  $("score").textContent=score;
  progressMission("score",1);
@@ -481,6 +942,10 @@ function gameLoop(){
  draw();
  animationId=requestAnimationFrame(gameLoop);
 }
+
+/* =====================================
+   START AND END
+===================================== */
 
 function startGame(){
  if(running)return;
@@ -490,25 +955,34 @@ function startGame(){
  player.x=340;
  obstacles=[];
  items=[];
+ bullets=[];
+ boss=null;
+
  score=0;
  frame=0;
  shield=0;
  level=1;
  missionProgress=0;
+ lastBossLevel=0;
+ bossShootCooldown=0;
+ playerShootCooldown=0;
+
  running=true;
 
  $("score").textContent=0;
  $("menu").hidden=true;
  $("shop").hidden=true;
  $("over").hidden=true;
+ $("leaderboard").hidden=true;
  $("hud").hidden=false;
+ $("mobileShoot").hidden=false;
 
  updateMissionUI();
  draw();
  gameLoop();
 }
 
-function endGame(){
+async function endGame(){
  running=false;
  cancelAnimationFrame(animationId);
 
@@ -518,13 +992,22 @@ function endGame(){
  updateUI();
 
  $("finalScore").textContent=score;
+
  $("finalMission").textContent=
   "Current mission progress: "+missionProgress+
   "/"+currentMission().target;
 
  $("over").hidden=false;
+ $("mobileShoot").hidden=true;
+
  draw();
+
+ submitScore();
 }
+
+/* =====================================
+   CONTROLS
+===================================== */
 
 document.addEventListener("keydown",e=>{
  keys[e.key]=true;
@@ -561,9 +1044,29 @@ canvas.addEventListener("pointermove",e=>{
  }
 });
 
+$("mobileShoot").addEventListener("pointerdown",e=>{
+ e.preventDefault();
+ keys[" "]=true;
+});
+
+$("mobileShoot").addEventListener("pointerup",()=>{
+ keys[" "]=false;
+});
+
+$("mobileShoot").addEventListener("pointerleave",()=>{
+ keys[" "]=false;
+});
+
+/* =====================================
+   INITIALIZE
+===================================== */
+
 updateUI();
 updateMenu();
 draw();
+
+connectAccount();
 </script>
+
 </body>
 </html>
