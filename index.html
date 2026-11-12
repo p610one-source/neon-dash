@@ -3,348 +3,332 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Neon Rush</title>
-
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neon Rush V2</title>
 <style>
-* {
-    box-sizing: border-box;
+*{box-sizing:border-box}
+body{
+ margin:0;background:#080b18;color:white;
+ font-family:Arial,sans-serif;text-align:center;
 }
-
-body {
-    margin: 0;
-    background: #080b18;
-    color: white;
-    font-family: Arial, sans-serif;
-    text-align: center;
-    overflow: hidden;
+h1{color:#00eaff;letter-spacing:5px;text-shadow:0 0 15px #00eaff}
+.stats{display:flex;justify-content:center;gap:22px;flex-wrap:wrap;margin:12px}
+canvas{
+ width:min(94vw,720px);height:auto;aspect-ratio:3/2;
+ background:#10172c;border:2px solid #00eaff;
+ border-radius:12px;touch-action:none;
 }
-
-h1 {
-    color: #00eaff;
-    letter-spacing: 5px;
-    margin: 15px 0 5px;
-    text-shadow: 0 0 15px #00eaff;
+button{
+ padding:11px 20px;margin:5px;border:0;border-radius:8px;
+ background:#00d9ff;color:#07111d;font-weight:bold;cursor:pointer;
 }
-
-.info {
-    display: flex;
-    justify-content: center;
-    gap: 35px;
-    margin: 12px;
-    font-size: 17px;
+button:disabled{opacity:.4;cursor:not-allowed}
+#shop{
+ margin:12px auto;padding:12px;max-width:500px;
+ border:1px solid #00eaff;border-radius:12px;
 }
-
-canvas {
-    display: block;
-    width: min(94vw, 720px);
-    height: auto;
-    aspect-ratio: 3 / 2;
-    margin: 10px auto;
-    border: 2px solid #00eaff;
-    border-radius: 12px;
-    background: #10172c;
-    box-shadow: 0 0 25px #006bff55;
-    touch-action: none;
-}
-
-button {
-    background: #00d9ff;
-    border: none;
-    border-radius: 8px;
-    padding: 12px 28px;
-    font-size: 17px;
-    font-weight: bold;
-    cursor: pointer;
-    color: #07111d;
-}
-
-button:hover {
-    background: white;
-}
-
-p {
-    color: #aab8d3;
-    font-size: 13px;
-}
+#message{color:#00eaff;min-height:22px}
+p{color:#aab8d3;font-size:13px}
 </style>
 </head>
-
 <body>
 
 <h1>NEON RUSH</h1>
+<p>VERSION 2 — COINS & POWER-UPS</p>
 
-<div class="info">
-    <span>Score: <b id="score">0</b></span>
-    <span>Best: <b id="best">0</b></span>
+<div class="stats">
+ <span>Score: <b id="score">0</b></span>
+ <span>Coins: <b id="coins">0</b></span>
+ <span>Best: <b id="best">0</b></span>
 </div>
 
 <canvas id="game" width="720" height="480"></canvas>
 
-<button id="start">START GAME</button>
-<p>PC: Arrow keys or A/D | Mobile: Touch and drag</p>
+<div>
+ <button id="start">START GAME</button>
+ <button id="shopToggle">OPEN SHOP</button>
+</div>
+
+<div id="shop" hidden>
+ <h2>⚡ NEON SHOP</h2>
+ <p>Upgrade your shield duration.</p>
+ <p>Shield level: <b id="level">1</b></p>
+ <p>Upgrade cost: <b id="cost">20</b> coins</p>
+ <button id="buy">BUY SHIELD UPGRADE</button>
+ <p id="message"></p>
+ <button id="closeShop">CLOSE SHOP</button>
+</div>
+
+<p>PC: Arrow keys / A-D | Mobile: Touch and drag</p>
+<p>🟡 Collect coins | 🟢 Collect shields | 🔴 Avoid obstacles</p>
 
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
 
-const scoreText = document.getElementById("score");
-const bestText = document.getElementById("best");
-const startButton = document.getElementById("start");
+const $=id=>document.getElementById(id);
 
-let player = {
-    x: 340,
-    y: 410,
-    width: 40,
-    height: 40,
-    speed: 7
+let coins=Number(localStorage.getItem("nrCoins"))||0;
+let best=Number(localStorage.getItem("nrBest"))||0;
+let shieldLevel=Number(localStorage.getItem("nrShield"))||1;
+
+let score=0,frame=0;
+let running=false;
+let keys={};
+let obstacles=[],items=[];
+let shield=0;
+let animationId=null;
+
+const player={x:340,y:410,w:40,h:40,speed:7};
+
+function save(){
+ localStorage.setItem("nrCoins",coins);
+ localStorage.setItem("nrBest",best);
+ localStorage.setItem("nrShield",shieldLevel);
+}
+
+function updateUI(){
+ $("coins").textContent=coins;
+ $("best").textContent=best;
+ $("level").textContent=shieldLevel;
+ $("cost").textContent=20*shieldLevel;
+ $("buy").disabled=coins<20*shieldLevel;
+}
+
+function background(){
+ ctx.fillStyle="#10172c";
+ ctx.fillRect(0,0,720,480);
+ ctx.strokeStyle="#1b2946";
+
+ for(let x=0;x<720;x+=40){
+  ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,480);ctx.stroke();
+ }
+ for(let y=0;y<480;y+=40){
+  ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(720,y);ctx.stroke();
+ }
+}
+
+function drawPlayer(){
+ ctx.shadowBlur=20;
+ ctx.shadowColor=shield>0?"#00ff88":"#00eaff";
+ ctx.fillStyle="#00eaff";
+ ctx.fillRect(player.x,player.y,player.w,player.h);
+
+ ctx.fillStyle="white";
+ ctx.fillRect(player.x+9,player.y+10,7,7);
+ ctx.fillRect(player.x+24,player.y+10,7,7);
+
+ if(shield>0){
+  ctx.strokeStyle="#00ff88";
+  ctx.lineWidth=4;
+  ctx.beginPath();
+  ctx.arc(player.x+20,player.y+20,31,0,Math.PI*2);
+  ctx.stroke();
+ }
+ ctx.shadowBlur=0;
+}
+
+function drawItems(){
+ items.forEach(item=>{
+  ctx.font="25px Arial";
+  ctx.textAlign="center";
+  ctx.fillText(item.type==="coin"?"🟡":"🟢",
+   item.x,item.y+10);
+ });
+}
+
+function drawObstacles(){
+ ctx.shadowBlur=15;
+ ctx.shadowColor="#ff267e";
+ ctx.fillStyle="#ff267e";
+ obstacles.forEach(o=>{
+  ctx.fillRect(o.x,o.y,o.w,o.h);
+ });
+ ctx.shadowBlur=0;
+}
+
+function draw(){
+ background();
+ drawItems();
+ drawObstacles();
+ drawPlayer();
+}
+
+function addObstacle(){
+ let w=30+Math.random()*35;
+ obstacles.push({
+  x:Math.random()*(720-w),y:-40,w,h:25,
+  speed:3+Math.min(score/100,7)
+ });
+}
+
+function addItem(type){
+ items.push({
+  x:20+Math.random()*680,
+  y:-20,
+  type,
+  speed:3
+ });
+}
+
+function hit(a,b){
+ return a.x<b.x+b.w && a.x+a.w>b.x &&
+        a.y<b.y+b.h && a.y+a.h>b.y;
+}
+
+function gameLoop(){
+ if(!running)return;
+
+ frame++;
+
+ if(keys.ArrowLeft||keys.a||keys.A)player.x-=player.speed;
+ if(keys.ArrowRight||keys.d||keys.D)player.x+=player.speed;
+
+ player.x=Math.max(0,Math.min(680,player.x));
+
+ if(frame%Math.max(12,42-Math.floor(score/40))===0)
+  addObstacle();
+
+ if(frame%85===0)addItem("coin");
+ if(frame%650===0)addItem("shield");
+
+ obstacles.forEach(o=>o.y+=o.speed);
+ items.forEach(i=>i.y+=i.speed);
+
+ for(let i=obstacles.length-1;i>=0;i--){
+  let o=obstacles[i];
+  if(hit(player,o)){
+   if(shield>0){
+    shield=0;
+    obstacles.splice(i,1);
+    continue;
+   }
+   endGame();
+   return;
+  }
+ }
+
+ for(let i=items.length-1;i>=0;i--){
+  let item=items[i];
+  if(hit(player,{x:item.x-12,y:item.y-12,w:24,h:24})){
+   if(item.type==="coin"){
+    coins++;
+    save();
+    updateUI();
+   }else{
+    shield=300*shieldLevel;
+   }
+   items.splice(i,1);
+  }
+ }
+
+ obstacles=obstacles.filter(o=>o.y<520);
+ items=items.filter(i=>i.y<520);
+
+ if(shield>0)shield--;
+
+ score++;
+ $("score").textContent=score;
+
+ draw();
+ animationId=requestAnimationFrame(gameLoop);
+}
+
+function endGame(){
+ running=false;
+ cancelAnimationFrame(animationId);
+
+ if(score>best)best=score;
+ save();
+ updateUI();
+
+ draw();
+ ctx.fillStyle="rgba(0,0,0,.78)";
+ ctx.fillRect(0,0,720,480);
+ ctx.textAlign="center";
+ ctx.fillStyle="#ff267e";
+ ctx.font="bold 48px Arial";
+ ctx.fillText("GAME OVER",360,210);
+ ctx.fillStyle="white";
+ ctx.font="24px Arial";
+ ctx.fillText("Score: "+score,360,260);
+ ctx.fillStyle="#00eaff";
+ ctx.font="18px Arial";
+ ctx.fillText("Press RESTART to play again",360,305);
+
+ $("start").textContent="RESTART";
+}
+
+function startGame(){
+ if(running)return;
+ cancelAnimationFrame(animationId);
+
+ player.x=340;
+ obstacles=[];
+ items=[];
+ score=0;
+ frame=0;
+ shield=0;
+ running=true;
+
+ $("score").textContent=0;
+ $("start").textContent="PLAYING...";
+ gameLoop();
+}
+
+$("start").onclick=startGame;
+
+$("shopToggle").onclick=()=>{
+ $("shop").hidden=!$("shop").hidden;
 };
 
-let obstacles = [];
-let score = 0;
-let best = 0;
-let gameRunning = false;
-let gameOver = false;
-let frame = 0;
-let keys = {};
-let animationId = null;
+$("closeShop").onclick=()=>{
+ $("shop").hidden=true;
+};
 
-try {
-    best = Number(localStorage.getItem("neonRushBest")) || 0;
-} catch (e) {}
+$("buy").onclick=()=>{
+ let cost=20*shieldLevel;
 
-bestText.textContent = best;
+ if(coins>=cost){
+  coins-=cost;
+  shieldLevel++;
+  save();
+  updateUI();
+  $("message").textContent="Upgrade purchased!";
+ }else{
+  $("message").textContent="Not enough coins!";
+ }
+};
 
-function drawPlayer() {
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = "#00eaff";
-    ctx.fillStyle = "#00eaff";
-
-    ctx.fillRect(
-        player.x,
-        player.y,
-        player.width,
-        player.height
-    );
-
-    ctx.shadowBlur = 0;
-
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(player.x + 9, player.y + 10, 7, 7);
-    ctx.fillRect(player.x + 24, player.y + 10, 7, 7);
-}
-
-function createObstacle() {
-    const width = 30 + Math.random() * 35;
-
-    obstacles.push({
-        x: Math.random() * (canvas.width - width),
-        y: -40,
-        width: width,
-        height: 25,
-        speed: 3 + Math.min(score / 100, 7)
-    });
-}
-
-function drawObstacles() {
-    ctx.shadowBlur = 15;
-    ctx.shadowColor = "#ff267e";
-    ctx.fillStyle = "#ff267e";
-
-    obstacles.forEach(obstacle => {
-        ctx.fillRect(
-            obstacle.x,
-            obstacle.y,
-            obstacle.width,
-            obstacle.height
-        );
-    });
-
-    ctx.shadowBlur = 0;
-}
-
-function collision(a, b) {
-    return (
-        a.x < b.x + b.width &&
-        a.x + a.width > b.x &&
-        a.y < b.y + b.height &&
-        a.y + a.height > b.y
-    );
-}
-
-function drawBackground() {
-    ctx.fillStyle = "#10172c";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.strokeStyle = "#1b2946";
-    ctx.lineWidth = 1;
-
-    for (let x = 0; x < canvas.width; x += 40) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, canvas.height);
-        ctx.stroke();
-    }
-
-    for (let y = 0; y < canvas.height; y += 40) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(canvas.width, y);
-        ctx.stroke();
-    }
-}
-
-function update() {
-    if (!gameRunning) return;
-
-    frame++;
-
-    if (keys["ArrowLeft"] || keys["a"] || keys["A"]) {
-        player.x -= player.speed;
-    }
-
-    if (keys["ArrowRight"] || keys["d"] || keys["D"]) {
-        player.x += player.speed;
-    }
-
-    player.x = Math.max(
-        0,
-        Math.min(canvas.width - player.width, player.x)
-    );
-
-    if (frame % Math.max(12, 42 - Math.floor(score / 40)) === 0) {
-        createObstacle();
-    }
-
-    obstacles.forEach(obstacle => {
-        obstacle.y += obstacle.speed;
-    });
-
-    obstacles = obstacles.filter(
-        obstacle => obstacle.y < canvas.height + 40
-    );
-
-    score += 1;
-    scoreText.textContent = score;
-
-    for (let obstacle of obstacles) {
-        if (collision(player, obstacle)) {
-            endGame();
-            return;
-        }
-    }
-
-    draw();
-    animationId = requestAnimationFrame(update);
-}
-
-function draw() {
-    drawBackground();
-    drawPlayer();
-    drawObstacles();
-}
-
-function endGame() {
-    gameRunning = false;
-    gameOver = true;
-
-    if (score > best) {
-        best = score;
-        bestText.textContent = best;
-
-        try {
-            localStorage.setItem("neonRushBest", best);
-        } catch (e) {}
-    }
-
-    draw();
-
-    ctx.fillStyle = "rgba(0,0,0,0.75)";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    ctx.textAlign = "center";
-    ctx.fillStyle = "#ff267e";
-    ctx.font = "bold 48px Arial";
-    ctx.fillText("GAME OVER", 360, 210);
-
-    ctx.fillStyle = "white";
-    ctx.font = "24px Arial";
-    ctx.fillText("Final Score: " + score, 360, 260);
-
-    ctx.font = "18px Arial";
-    ctx.fillStyle = "#00eaff";
-    ctx.fillText("Press RESTART to play again", 360, 305);
-
-    startButton.textContent = "RESTART";
-}
-
-function startGame() {
-    if (animationId !== null) {
-        cancelAnimationFrame(animationId);
-    }
-
-    player.x = 340;
-    obstacles = [];
-    score = 0;
-    frame = 0;
-    gameOver = false;
-    gameRunning = true;
-
-    scoreText.textContent = "0";
-    startButton.textContent = "PLAYING...";
-
-    draw();
-    update();
-}
-
-startButton.addEventListener("click", () => {
-    if (!gameRunning) startGame();
+document.addEventListener("keydown",e=>{
+ keys[e.key]=true;
+ if(["ArrowLeft","ArrowRight"," "].includes(e.key))
+  e.preventDefault();
 });
 
-document.addEventListener("keydown", e => {
-    keys[e.key] = true;
-
-    if (["ArrowLeft", "ArrowRight", " "].includes(e.key)) {
-        e.preventDefault();
-    }
+document.addEventListener("keyup",e=>{
+ keys[e.key]=false;
 });
 
-document.addEventListener("keyup", e => {
-    keys[e.key] = false;
+function moveTo(e){
+ if(!running)return;
+ const rect=canvas.getBoundingClientRect();
+ const x=(e.clientX-rect.left)*720/rect.width;
+ player.x=Math.max(0,Math.min(680,x-20));
+}
+
+canvas.addEventListener("pointerdown",e=>{
+ if(!running)return;
+ canvas.setPointerCapture(e.pointerId);
+ moveTo(e);
 });
 
-// Mobile touch controls
-canvas.addEventListener("pointermove", e => {
-    if (!gameRunning || e.buttons === 0 && e.pointerType === "mouse") {
-        return;
-    }
-
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-
-    player.x = (e.clientX - rect.left) * scaleX
-        - player.width / 2;
-
-    player.x = Math.max(
-        0,
-        Math.min(canvas.width - player.width, player.x)
-    );
+canvas.addEventListener("pointermove",e=>{
+ if(e.buttons>0||e.pointerType==="touch")moveTo(e);
 });
 
-canvas.addEventListener("pointerdown", e => {
-    if (!gameRunning) return;
-
-    canvas.setPointerCapture(e.pointerId);
-
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-
-    player.x = (e.clientX - rect.left) * scaleX
-        - player.width / 2;
-});
-
+updateUI();
 draw();
 </script>
-
 </body>
 </html>
