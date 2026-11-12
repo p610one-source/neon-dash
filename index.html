@@ -1,0 +1,350 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon Rush</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #080b18;
+    color: white;
+    font-family: Arial, sans-serif;
+    text-align: center;
+    overflow: hidden;
+}
+
+h1 {
+    color: #00eaff;
+    letter-spacing: 5px;
+    margin: 15px 0 5px;
+    text-shadow: 0 0 15px #00eaff;
+}
+
+.info {
+    display: flex;
+    justify-content: center;
+    gap: 35px;
+    margin: 12px;
+    font-size: 17px;
+}
+
+canvas {
+    display: block;
+    width: min(94vw, 720px);
+    height: auto;
+    aspect-ratio: 3 / 2;
+    margin: 10px auto;
+    border: 2px solid #00eaff;
+    border-radius: 12px;
+    background: #10172c;
+    box-shadow: 0 0 25px #006bff55;
+    touch-action: none;
+}
+
+button {
+    background: #00d9ff;
+    border: none;
+    border-radius: 8px;
+    padding: 12px 28px;
+    font-size: 17px;
+    font-weight: bold;
+    cursor: pointer;
+    color: #07111d;
+}
+
+button:hover {
+    background: white;
+}
+
+p {
+    color: #aab8d3;
+    font-size: 13px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>NEON RUSH</h1>
+
+<div class="info">
+    <span>Score: <b id="score">0</b></span>
+    <span>Best: <b id="best">0</b></span>
+</div>
+
+<canvas id="game" width="720" height="480"></canvas>
+
+<button id="start">START GAME</button>
+<p>PC: Arrow keys or A/D | Mobile: Touch and drag</p>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const scoreText = document.getElementById("score");
+const bestText = document.getElementById("best");
+const startButton = document.getElementById("start");
+
+let player = {
+    x: 340,
+    y: 410,
+    width: 40,
+    height: 40,
+    speed: 7
+};
+
+let obstacles = [];
+let score = 0;
+let best = 0;
+let gameRunning = false;
+let gameOver = false;
+let frame = 0;
+let keys = {};
+let animationId = null;
+
+try {
+    best = Number(localStorage.getItem("neonRushBest")) || 0;
+} catch (e) {}
+
+bestText.textContent = best;
+
+function drawPlayer() {
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = "#00eaff";
+    ctx.fillStyle = "#00eaff";
+
+    ctx.fillRect(
+        player.x,
+        player.y,
+        player.width,
+        player.height
+    );
+
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(player.x + 9, player.y + 10, 7, 7);
+    ctx.fillRect(player.x + 24, player.y + 10, 7, 7);
+}
+
+function createObstacle() {
+    const width = 30 + Math.random() * 35;
+
+    obstacles.push({
+        x: Math.random() * (canvas.width - width),
+        y: -40,
+        width: width,
+        height: 25,
+        speed: 3 + Math.min(score / 100, 7)
+    });
+}
+
+function drawObstacles() {
+    ctx.shadowBlur = 15;
+    ctx.shadowColor = "#ff267e";
+    ctx.fillStyle = "#ff267e";
+
+    obstacles.forEach(obstacle => {
+        ctx.fillRect(
+            obstacle.x,
+            obstacle.y,
+            obstacle.width,
+            obstacle.height
+        );
+    });
+
+    ctx.shadowBlur = 0;
+}
+
+function collision(a, b) {
+    return (
+        a.x < b.x + b.width &&
+        a.x + a.width > b.x &&
+        a.y < b.y + b.height &&
+        a.y + a.height > b.y
+    );
+}
+
+function drawBackground() {
+    ctx.fillStyle = "#10172c";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.strokeStyle = "#1b2946";
+    ctx.lineWidth = 1;
+
+    for (let x = 0; x < canvas.width; x += 40) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvas.height);
+        ctx.stroke();
+    }
+
+    for (let y = 0; y < canvas.height; y += 40) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+    }
+}
+
+function update() {
+    if (!gameRunning) return;
+
+    frame++;
+
+    if (keys["ArrowLeft"] || keys["a"] || keys["A"]) {
+        player.x -= player.speed;
+    }
+
+    if (keys["ArrowRight"] || keys["d"] || keys["D"]) {
+        player.x += player.speed;
+    }
+
+    player.x = Math.max(
+        0,
+        Math.min(canvas.width - player.width, player.x)
+    );
+
+    if (frame % Math.max(12, 42 - Math.floor(score / 40)) === 0) {
+        createObstacle();
+    }
+
+    obstacles.forEach(obstacle => {
+        obstacle.y += obstacle.speed;
+    });
+
+    obstacles = obstacles.filter(
+        obstacle => obstacle.y < canvas.height + 40
+    );
+
+    score += 1;
+    scoreText.textContent = score;
+
+    for (let obstacle of obstacles) {
+        if (collision(player, obstacle)) {
+            endGame();
+            return;
+        }
+    }
+
+    draw();
+    animationId = requestAnimationFrame(update);
+}
+
+function draw() {
+    drawBackground();
+    drawPlayer();
+    drawObstacles();
+}
+
+function endGame() {
+    gameRunning = false;
+    gameOver = true;
+
+    if (score > best) {
+        best = score;
+        bestText.textContent = best;
+
+        try {
+            localStorage.setItem("neonRushBest", best);
+        } catch (e) {}
+    }
+
+    draw();
+
+    ctx.fillStyle = "rgba(0,0,0,0.75)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#ff267e";
+    ctx.font = "bold 48px Arial";
+    ctx.fillText("GAME OVER", 360, 210);
+
+    ctx.fillStyle = "white";
+    ctx.font = "24px Arial";
+    ctx.fillText("Final Score: " + score, 360, 260);
+
+    ctx.font = "18px Arial";
+    ctx.fillStyle = "#00eaff";
+    ctx.fillText("Press RESTART to play again", 360, 305);
+
+    startButton.textContent = "RESTART";
+}
+
+function startGame() {
+    if (animationId !== null) {
+        cancelAnimationFrame(animationId);
+    }
+
+    player.x = 340;
+    obstacles = [];
+    score = 0;
+    frame = 0;
+    gameOver = false;
+    gameRunning = true;
+
+    scoreText.textContent = "0";
+    startButton.textContent = "PLAYING...";
+
+    draw();
+    update();
+}
+
+startButton.addEventListener("click", () => {
+    if (!gameRunning) startGame();
+});
+
+document.addEventListener("keydown", e => {
+    keys[e.key] = true;
+
+    if (["ArrowLeft", "ArrowRight", " "].includes(e.key)) {
+        e.preventDefault();
+    }
+});
+
+document.addEventListener("keyup", e => {
+    keys[e.key] = false;
+});
+
+// Mobile touch controls
+canvas.addEventListener("pointermove", e => {
+    if (!gameRunning || e.buttons === 0 && e.pointerType === "mouse") {
+        return;
+    }
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+
+    player.x = (e.clientX - rect.left) * scaleX
+        - player.width / 2;
+
+    player.x = Math.max(
+        0,
+        Math.min(canvas.width - player.width, player.x)
+    );
+});
+
+canvas.addEventListener("pointerdown", e => {
+    if (!gameRunning) return;
+
+    canvas.setPointerCapture(e.pointerId);
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+
+    player.x = (e.clientX - rect.left) * scaleX
+        - player.width / 2;
+});
+
+draw();
+</script>
+
+</body>
+</html>
