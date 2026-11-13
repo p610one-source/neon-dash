@@ -214,19 +214,15 @@ async function updatePlayerActivity(){
 
   if(activityError)throw activityError;
 
-  const {data,error}=await db
-   .from("player_activity")
-   .select("user_id,last_seen");
+  const {data,error}=await db.rpc("get_player_stats");
 
   if(error)throw error;
 
-  const cutoff=Date.now()-90*1000;
-  const online=(data||[]).filter(p=>
-   new Date(p.last_seen).getTime()>cutoff
-  ).length;
+  const stats=Array.isArray(data)?data[0]:data;
+  if(!stats)throw new Error("Player stats were not returned");
 
-  $("onlinePlayers").textContent=online;
-  $("totalPlayers").textContent=(data||[]).length;
+  $("onlinePlayers").textContent=stats.online_players;
+  $("totalPlayers").textContent=stats.total_players;
 
  }catch(error){
   console.error("Player counter:",error);
