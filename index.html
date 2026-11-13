@@ -46,6 +46,12 @@ p{color:#aab8d3;font-size:13px}
 <span>Level: <b id="levelTop">1</b></span>
 </div>
 
+<div class="panel" id="playerStats" style="max-width:720px;padding:10px;margin:8px auto">
+<span>🟢 Online now: <b id="onlinePlayers">—</b></span>
+&nbsp;&nbsp; | &nbsp;&nbsp;
+<span>🌍 Total players: <b id="totalPlayers">—</b></span>
+</div>
+
 <div id="hud" hidden>
 <span id="levelLabel">LEVEL 1</span>
 <span id="missionText">Mission loading...</span>
@@ -184,6 +190,61 @@ async function connectAccount(){
   return false;
  }
 }
+
+/* =====================================
+   LIVE PLAYER COUNTER
+===================================== */
+
+let activityBusy=false;
+
+async function updatePlayerActivity(){
+ if(activityBusy || document.visibilityState!=="visible")return;
+ activityBusy=true;
+
+ try{
+  const connected=currentUser || await connectAccount();
+  if(!connected || !currentUser)throw new Error("Player account unavailable");
+
+  const {error:activityError}=await db
+   .from("player_activity")
+   .upsert({
+    user_id:currentUser.id,
+    last_seen:new Date().toISOString()
+   },{onConflict:"user_id"});
+
+  if(activityError)throw activityError;
+
+  const {data,error}=await db
+   .from("player_activity")
+   .select("user_id,last_seen");
+
+  if(error)throw error;
+
+  const cutoff=Date.now()-90*1000;
+  const online=(data||[]).filter(p=>
+   new Date(p.last_seen).getTime()>cutoff
+  ).length;
+
+  $("onlinePlayers").textContent=online;
+  $("totalPlayers").textContent=(data||[]).length;
+
+ }catch(error){
+  console.error("Player counter:",error);
+  $("onlinePlayers").textContent="—";
+  $("totalPlayers").textContent="Unavailable";
+ }finally{
+  activityBusy=false;
+ }
+}
+
+setInterval(()=>{
+ if(document.visibilityState==="visible")updatePlayerActivity();
+},30000);
+
+document.addEventListener("visibilitychange",()=>{
+ if(document.visibilityState==="visible")updatePlayerActivity();
+});
+
 
 /* =====================================
    GAME DATA
@@ -1065,7 +1126,7 @@ updateUI();
 updateMenu();
 draw();
 
-connectAccount();
+updatePlayerActivity();
 </script>
 
 </body>
