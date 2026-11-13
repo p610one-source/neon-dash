@@ -241,6 +241,9 @@ document.addEventListener("visibilitychange",()=>{
  if(document.visibilityState==="visible")updatePlayerActivity();
 });
 
+// Register this visit immediately instead of waiting for the first 30-second refresh.
+updatePlayerActivity();
+
 
 /* =====================================
    GAME DATA
