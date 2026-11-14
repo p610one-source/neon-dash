@@ -40,6 +40,9 @@ p{color:#aab8d3;font-size:13px}
 .admin-power{background:#8b5cf6;color:white}
 .admin-controls{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:10px 0}
 .admin-controls input{max-width:150px}
+#globalNotice{max-width:720px;margin:10px auto;padding:12px;border:1px solid #ffd700;border-radius:10px;background:#242039;color:#fff}
+.admin-section textarea,.admin-section select{padding:10px;border-radius:8px;border:1px solid #00eaff;background:#080b18;color:white;max-width:100%;width:100%;margin:6px 0}
+#blockedNotice{max-width:720px;margin:12px auto;padding:18px;border:1px solid #ff477e;border-radius:12px;color:#ff9bb8;background:#251020}
 
 </style>
 </head>
@@ -47,7 +50,9 @@ p{color:#aab8d3;font-size:13px}
 <body>
 
 <h1>NEON RUSH</h1>
-<p>V5 — THE GLOBAL UPDATE</p>
+<p>V6 — ULTIMATE ADMIN UPDATE</p>
+<div id="globalNotice" hidden></div>
+<div id="blockedNotice" hidden>Access to Neon Rush has been blocked by an administrator. If you think this is a mistake, contact the game administrator.</div>
 
 <div class="stats">
 <span>Score: <b id="score">0</b></span>
@@ -178,6 +183,38 @@ p{color:#aab8d3;font-size:13px}
 </div>
 </div>
 <div class="admin-section">
+<h3>🌐 GLOBAL CONTROL ROOM</h3>
+<p class="admin-muted">These settings are shared with every player.</p>
+<label for="globalAnnouncementInput">Announcement (max 180 characters)</label>
+<textarea id="globalAnnouncementInput" maxlength="180" rows="2" placeholder="Message for every Neon Rush player..."></textarea>
+<div class="admin-controls">
+<button class="admin-power" onclick="adminPublishAnnouncement()">PUBLISH ANNOUNCEMENT</button>
+<button class="admin-danger" onclick="adminClearAnnouncement()">CLEAR ANNOUNCEMENT</button>
+</div>
+<label for="globalEventSelect">Global event</label>
+<select id="globalEventSelect">
+<option value="none">No event</option>
+<option value="double_coins">Double Coins</option>
+<option value="boss_rush">Boss Rush</option>
+<option value="coin_rain">Coin Rain</option>
+</select>
+<label for="globalSpeedInput">Game speed multiplier (0.5–2.0)</label>
+<input id="globalSpeedInput" type="number" min="0.5" max="2" step="0.1" value="1">
+<div class="admin-controls"><button class="admin-power" onclick="adminApplyGlobalSettings()">APPLY GLOBAL SETTINGS</button></div>
+<p id="globalControlStatus" class="admin-muted">Loading shared settings...</p>
+</div>
+<div class="admin-section">
+<h3>🚫 PLAYER ACCESS</h3>
+<p class="admin-muted">Block or restore a selected player’s access to online game services.</p>
+<label for="accessPlayerSelect">Choose player</label>
+<select id="accessPlayerSelect"><option value="">Refresh player list first</option></select>
+<div class="admin-controls">
+<button class="admin-danger" onclick="adminBlockSelectedPlayer()">BLOCK PLAYER</button>
+<button class="admin-power" onclick="adminUnblockSelectedPlayer()">UNBLOCK PLAYER</button>
+</div>
+<p id="blockControlStatus" class="admin-muted">Choose a player to manage access.</p>
+</div>
+<div class="admin-section">
 <h3>⚡ DEVELOPER CHAOS MODE</h3>
 <p class="admin-muted">These test powers affect your game in this browser only.</p>
 <div class="admin-controls">
@@ -197,6 +234,7 @@ p{color:#aab8d3;font-size:13px}
 <p class="admin-muted">Edit displayed names/scores or remove a leaderboard entry. Removing an entry does not delete the player's game account.</p>
 <div id="adminLeaderboardList"></div>
 </div>
+<button class="admin-power" onclick="adminGiveSelfMillion()">GIVE MYSELF 1,000,000 COINS</button>
 <button onclick="refreshAdminData()">REFRESH DATA</button>
 <button onclick="adminLogout()">SIGN OUT</button>
 <button onclick="showMenu()">BACK TO GAME</button>
@@ -239,9 +277,13 @@ SUPABASE_KEY
 
 let currentUser = null;
 let accountConnectionPromise = null;
+let accountBlocked = false;
+let globalGameSpeed = 1;
+let globalEvent = "none";
+let globalAnnouncement = "";
 
 async function connectAccount(){
- if(currentUser)return true;
+ if(currentUser)return !accountBlocked;
  if(accountConnectionPromise)return accountConnectionPromise;
 
  accountConnectionPromise=(async()=>{
@@ -251,13 +293,19 @@ async function connectAccount(){
 
    if(data.session){
     currentUser=data.session.user;
-    return true;
+   }else{
+    const result=await db.auth.signInAnonymously();
+    if(result.error)throw result.error;
+    currentUser=result.data.user;
    }
-
-   const result=await db.auth.signInAnonymously();
-   if(result.error)throw result.error;
-
-   currentUser=result.data.user;
+   const {data:blocked,error:blockedError}=await db.rpc("is_current_user_blocked");
+   if(blockedError)throw blockedError;
+   accountBlocked=blocked===true;
+   if(accountBlocked){
+    const notice=document.getElementById("blockedNotice");
+    if(notice)notice.hidden=false;
+    return false;
+   }
    return true;
   }catch(error){
    console.error("Supabase connection:",error);
@@ -721,6 +769,7 @@ async function adminLogin(){
   const {data,error}=await db.auth.signInWithPassword({email,password});
   if(error)throw error;
   currentUser=data.user;
+  accountBlocked=false;
   const {data:isAdmin,error:checkError}=await db.rpc("is_current_user_admin");
   if(checkError)throw checkError;
   if(isAdmin!==true){
@@ -749,6 +798,123 @@ let adminWallets = [];
 let adminGodMode=false;
 let adminStartBoss=false;
 let adminStartLevel=1;
+let adminBlockedPlayers=[];
+
+function adminShowGlobalSettings(data){
+ const state=Array.isArray(data)?data[0]:data;
+ if(!state)return;
+ globalAnnouncement=state.announcement||"";
+ globalEvent=state.event_type||"none";
+ globalGameSpeed=Number(state.game_speed)||1;
+ $("globalNotice").textContent=globalAnnouncement;
+ $("globalNotice").hidden=!globalAnnouncement;
+ $("globalAnnouncementInput").value=globalAnnouncement;
+ $("globalEventSelect").value=globalEvent;
+ $("globalSpeedInput").value=globalGameSpeed;
+ $("globalControlStatus").textContent="Live settings: "+globalEvent.replace("_"," ")+" · Speed "+globalGameSpeed+"×";
+}
+
+async function refreshGlobalGameState(){
+ try{
+  const {data,error}=await db.from("admin_game_state").select("announcement,event_type,game_speed").eq("id",1).maybeSingle();
+  if(error)throw error;
+  if(data){
+   globalAnnouncement=data.announcement||"";
+   globalEvent=data.event_type||"none";
+   globalGameSpeed=Number(data.game_speed)||1;
+   $("globalNotice").textContent=globalAnnouncement;
+   $("globalNotice").hidden=!globalAnnouncement;
+  }
+  if(currentUser){
+   const {data:blocked,error:blockedError}=await db.rpc("is_current_user_blocked");
+   if(!blockedError&&blocked===true){
+    accountBlocked=true;
+    running=false;
+    cancelAnimationFrame(animationId);
+    $("menu").hidden=true;
+    $("shop").hidden=true;
+    $("over").hidden=true;
+    $("leaderboard").hidden=true;
+    $("adminPanel").hidden=true;
+    $("blockedNotice").hidden=false;
+   }
+  }
+ }catch(error){console.warn("Global game state:",error);}
+}
+
+async function adminPublishAnnouncement(){
+ try{
+  await requireAdmin();
+  const announcement=$("globalAnnouncementInput").value.trim();
+  const {error}=await db.from("admin_game_state").update({announcement,updated_at:new Date().toISOString()}).eq("id",1);
+  if(error)throw error;
+  await refreshGlobalGameState();
+  $("globalControlStatus").textContent=announcement?"Announcement published to all players.":"Announcement cleared.";
+ }catch(error){$("globalControlStatus").textContent="Publish failed: "+error.message;}
+}
+async function adminClearAnnouncement(){
+ $("globalAnnouncementInput").value="";
+ await adminPublishAnnouncement();
+}
+async function adminApplyGlobalSettings(){
+ try{
+  await requireAdmin();
+  const eventType=$("globalEventSelect").value;
+  const speed=Number($("globalSpeedInput").value);
+  if(!["none","double_coins","boss_rush","coin_rain"].includes(eventType))throw new Error("Choose a valid event.");
+  if(!Number.isFinite(speed)||speed<0.5||speed>2)throw new Error("Speed must be between 0.5 and 2.0.");
+  const {error}=await db.from("admin_game_state").update({event_type:eventType,game_speed:speed,updated_at:new Date().toISOString()}).eq("id",1);
+  if(error)throw error;
+  await refreshGlobalGameState();
+  $("globalControlStatus").textContent="Global settings applied to all players.";
+ }catch(error){$("globalControlStatus").textContent="Settings failed: "+error.message;}
+}
+async function adminBlockSelectedPlayer(){
+ const userId=$("accessPlayerSelect").value;
+ if(!userId){$("blockControlStatus").textContent="Choose a player first.";return;}
+ if(userId===currentUser?.id){$("blockControlStatus").textContent="You cannot block your own admin account.";return;}
+ try{
+  await requireAdmin();
+  const {error}=await db.rpc("admin_block_player",{target_user_id:userId});
+  if(error)throw error;
+  $("blockControlStatus").textContent="Player blocked from online game services.";
+  await refreshAdminData();
+ }catch(error){$("blockControlStatus").textContent="Block failed: "+error.message;}
+}
+async function adminUnblockSelectedPlayer(){
+ const userId=$("accessPlayerSelect").value;
+ if(!userId){$("blockControlStatus").textContent="Choose a player first.";return;}
+ try{
+  await requireAdmin();
+  const {error}=await db.rpc("admin_unblock_player",{target_user_id:userId});
+  if(error)throw error;
+  $("blockControlStatus").textContent="Player access restored.";
+  await refreshAdminData();
+ }catch(error){$("blockControlStatus").textContent="Unblock failed: "+error.message;}
+}
+async function adminGiveSelfMillion(){
+ await adminAdjustCoins(currentUser.id,1000000);
+}
+async function adminLoadBlockedPlayers(){
+ const {data,error}=await db.rpc("admin_list_blocked_players");
+ if(error)throw error;
+ adminBlockedPlayers=data||[];
+ const select=$("accessPlayerSelect");
+ const previous=select.value;
+ select.replaceChildren();
+ const placeholder=document.createElement("option");
+ placeholder.value="";
+ placeholder.textContent="— Select a player —";
+ select.appendChild(placeholder);
+ adminWallets.forEach(player=>{
+  const option=document.createElement("option");
+  option.value=player.user_id;
+  const blocked=adminBlockedPlayers.some(item=>item.user_id===player.user_id);
+  option.textContent=(player.player_name||"Unnamed player")+" · "+player.user_id.slice(0,8)+"…"+(blocked?" [BLOCKED]":"");
+  select.appendChild(option);
+ });
+ select.value=adminWallets.some(player=>player.user_id===previous)?previous:"";
+}
 
 function updateCoinSelection(){
  const select=$("coinPlayerSelect");
@@ -805,14 +971,17 @@ async function refreshAdminData(){
  status.textContent="Loading admin data...";
  try{
   await requireAdmin();
-  const [activityResult,leaderboardResult,walletResult]=await Promise.all([
+  const [activityResult,leaderboardResult,walletResult,globalResult]=await Promise.all([
    db.from("player_activity").select("user_id,first_seen,last_seen").order("last_seen",{ascending:false}).limit(100),
    db.from("leaderboard").select("user_id,player_name,score,updated_at").order("score",{ascending:false}).limit(100),
-   db.from("player_wallets").select("user_id,coins,updated_at").order("updated_at",{ascending:false}).limit(100)
+   db.from("player_wallets").select("user_id,coins,updated_at").order("updated_at",{ascending:false}).limit(100),
+   db.from("admin_game_state").select("announcement,event_type,game_speed").eq("id",1).maybeSingle()
   ]);
   if(activityResult.error)throw activityResult.error;
   if(leaderboardResult.error)throw leaderboardResult.error;
   if(walletResult.error)throw walletResult.error;
+  if(globalResult.error)throw globalResult.error;
+  adminShowGlobalSettings(globalResult.data);
 
   const activities=activityResult.data||[];
   const onlineCutoff=Date.now()-90000;
@@ -875,6 +1044,7 @@ async function refreshAdminData(){
    coinSelect.value=adminWallets.some(wallet=>wallet.user_id===previousSelection)?previousSelection:"";
    updateCoinSelection();
   }
+  await adminLoadBlockedPlayers();
 
   const leaderboardList=$("adminLeaderboardList");
   leaderboardList.replaceChildren();
@@ -1127,7 +1297,7 @@ function addItem(type){
   x:20+Math.random()*680,
   y:-20,
   type,
-  speed:3.2
+  speed:3.2*globalGameSpeed
  });
 }
 
@@ -1164,15 +1334,16 @@ function progressMission(type,amount){
 
  if(missionProgress>=m.target){
   missionProgress=0;
-  coins+=m.reward;
-  syncWalletDelta(m.reward);
+  const reward=m.reward*(globalEvent==="double_coins"?2:1);
+  coins+=reward;
+  syncWalletDelta(reward);
   missionIndex=(missionIndex+1)%missions.length;
 
   save();
   updateUI();
 
   $("missionText").textContent=
-   `MISSION COMPLETE! +${m.reward} COINS`;
+   "MISSION COMPLETE! +"+reward+" COINS";
 
   setTimeout(()=>{
    if(running)updateMissionUI();
@@ -1224,7 +1395,7 @@ function shoot(){
 function updateBoss(){
  if(!boss)return;
 
- boss.x+=boss.direction*(2.5+level*.1);
+ boss.x+=boss.direction*(2.5+level*.1)*globalGameSpeed;
 
  if(boss.x<10||boss.x+boss.w>710){
   boss.direction*=-1;
@@ -1249,7 +1420,7 @@ function updateBoss(){
   const b=bullets[i];
 
   if(b.fromBoss){
-   b.y+=b.speed;
+   b.y+=b.speed*globalGameSpeed;
 
    if(hit(player,b)&&!adminGodMode){
     bullets.splice(i,1);
@@ -1263,7 +1434,7 @@ function updateBoss(){
    }
 
   }else{
-   b.y-=b.speed;
+   b.y-=b.speed*globalGameSpeed;
 
    if(hit(b,boss)){
     boss.hp--;
@@ -1286,8 +1457,9 @@ function updateBoss(){
 function defeatBoss(){
  boss=null;
  bullets=[];
- coins+=50+level*10;
- syncWalletDelta(50+level*10);
+ const bossReward=(50+level*10)*(globalEvent==="double_coins"?2:1);
+ coins+=bossReward;
+ syncWalletDelta(bossReward);
 
  $("bossText").textContent="BOSS DEFEATED!";
  $("missionText").textContent="BOSS DEFEATED! BONUS COINS EARNED!";
@@ -1312,8 +1484,8 @@ function gameLoop(){
 
  frame++;
 
- if(keys.ArrowLeft||keys.a||keys.A)player.x-=player.speed;
- if(keys.ArrowRight||keys.d||keys.D)player.x+=player.speed;
+ if(keys.ArrowLeft||keys.a||keys.A)player.x-=player.speed*globalGameSpeed;
+ if(keys.ArrowRight||keys.d||keys.D)player.x+=player.speed*globalGameSpeed;
 
  player.x=Math.max(0,Math.min(680,player.x));
 
@@ -1330,7 +1502,8 @@ function gameLoop(){
   updateUI();
   updateMissionUI();
 
-  if(level%5===0&&level>lastBossLevel){
+  const bossInterval=globalEvent==="boss_rush"?3:5;
+  if(level%bossInterval===0&&level>lastBossLevel){
    lastBossLevel=level;
    spawnBoss();
   }
@@ -1340,12 +1513,13 @@ function gameLoop(){
 
  if(!boss){
   if(frame%spawnRate===0)addObstacle();
-  if(frame%78===0)addItem("coin");
+  const coinInterval=globalEvent==="coin_rain"?28:78;
+  if(frame%coinInterval===0)addItem("coin");
   if(frame%600===0)addItem("shield");
  }
 
  obstacles.forEach(o=>{
-  o.y+=o.speed;
+  o.y+=o.speed*globalGameSpeed;
 
   if(o.type==="zigzag"){
    o.x+=Math.sin(frame/12+o.phase)*3.2;
@@ -1386,8 +1560,9 @@ function gameLoop(){
    x:item.x-12,y:item.y-12,w:24,h:24
   })){
    if(item.type==="coin"){
-    coins++;
-    syncWalletDelta(1);
+    const coinValue=globalEvent==="double_coins"?2:1;
+    coins+=coinValue;
+    syncWalletDelta(coinValue);
     progressMission("coins",1);
     save();
     updateUI();
@@ -1541,6 +1716,8 @@ draw();
 
 loadMyWallet();
 updatePlayerActivity();
+refreshGlobalGameState();
+setInterval(refreshGlobalGameState,15000);
 </script>
 
 </body>
