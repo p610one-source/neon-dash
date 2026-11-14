@@ -802,6 +802,7 @@ async function refreshAdminData(){
    if(!allPlayers.has(player.user_id))allPlayers.set(player.user_id,{user_id:player.user_id,coins:0,updated_at:null});
   });
   adminWallets=Array.from(allPlayers.values()).map(player=>({...player,player_name:playerNames.get(player.user_id)||""}));
+  console.log("Admin coin selector diagnostics:",{activityRows:activities.length,uniquePlayerIds:allPlayers.size,walletRows:wallets.length,leaderboardRows:(leaderboardResult.data||[]).length});
   const coinSelect=$("coinPlayerSelect");
   const previousSelection=coinSelect.value;
   coinSelect.replaceChildren();
@@ -864,7 +865,7 @@ async function refreshAdminData(){
     leaderboardList.appendChild(row);
    });
   }
-  status.textContent="Admin data refreshed.";
+  status.textContent="Admin data refreshed. Activity: "+activities.length+" · Unique players: "+adminWallets.length+" · Dropdown options: "+coinSelect.options.length;
  }catch(error){
   console.error("Admin refresh:",error);
   status.textContent="Could not load admin data: "+error.message;
