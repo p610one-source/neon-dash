@@ -896,7 +896,7 @@ async function adminGiveSelfMillion(){
  await adminAdjustCoins(currentUser.id,1000000);
 }
 async function adminLoadBlockedPlayers(){
- const {data,error}=await db.rpc("admin_list_blocked_players");
+ const {data,error}=await db.from("admin_blocked_players").select("user_id,blocked_at");
  if(error)throw error;
  adminBlockedPlayers=data||[];
  const select=$("accessPlayerSelect");
@@ -1596,6 +1596,10 @@ function gameLoop(){
 ===================================== */
 
 function startGame(){
+ if(accountBlocked){
+  $("blockedNotice").hidden=false;
+  return;
+ }
  if(running)return;
 
  cancelAnimationFrame(animationId);
