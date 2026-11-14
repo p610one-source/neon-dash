@@ -209,28 +209,37 @@ SUPABASE_KEY
 );
 
 let currentUser = null;
+let accountConnectionPromise = null;
 
 async function connectAccount(){
- try{
-  const {data,error} = await db.auth.getSession();
+ if(currentUser)return true;
+ if(accountConnectionPromise)return accountConnectionPromise;
 
-  if(error) throw error;
+ accountConnectionPromise=(async()=>{
+  try{
+   const {data,error}=await db.auth.getSession();
+   if(error)throw error;
 
-  if(data.session){
-   currentUser=data.session.user;
+   if(data.session){
+    currentUser=data.session.user;
+    return true;
+   }
+
+   const result=await db.auth.signInAnonymously();
+   if(result.error)throw result.error;
+
+   currentUser=result.data.user;
    return true;
+  }catch(error){
+   console.error("Supabase connection:",error);
+   return false;
   }
+ })();
 
-  const result=await db.auth.signInAnonymously();
-
-  if(result.error) throw result.error;
-
-  currentUser=result.data.user;
-  return true;
-
- }catch(error){
-  console.error("Supabase connection:",error);
-  return false;
+ try{
+  return await accountConnectionPromise;
+ }finally{
+  accountConnectionPromise=null;
  }
 }
 
