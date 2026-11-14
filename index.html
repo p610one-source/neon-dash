@@ -793,17 +793,25 @@ async function refreshAdminData(){
 
   const wallets=walletResult.data||[];
   const playerNames=new Map((leaderboardResult.data||[]).map(entry=>[entry.user_id,entry.player_name]));
-  adminWallets=wallets.map(wallet=>({...wallet,player_name:playerNames.get(wallet.user_id)||""}));
+  const allPlayers=new Map();
+  wallets.forEach(wallet=>allPlayers.set(wallet.user_id,{...wallet}));
+  activities.forEach(player=>{
+   if(!allPlayers.has(player.user_id))allPlayers.set(player.user_id,{user_id:player.user_id,coins:0,updated_at:null});
+  });
+  (leaderboardResult.data||[]).forEach(player=>{
+   if(!allPlayers.has(player.user_id))allPlayers.set(player.user_id,{user_id:player.user_id,coins:0,updated_at:null});
+  });
+  adminWallets=Array.from(allPlayers.values()).map(player=>({...player,player_name:playerNames.get(player.user_id)||""}));
   const coinSelect=$("coinPlayerSelect");
   const previousSelection=coinSelect.value;
   coinSelect.replaceChildren();
   if(!adminWallets.length){
    const option=document.createElement("option");
    option.value="";
-   option.textContent="No player wallets found yet";
+   option.textContent="No players found yet";
    coinSelect.appendChild(option);
    coinSelect.disabled=true;
-   $("coinPlayerBalance").textContent="Players appear here after opening the updated game.";
+   $("coinPlayerBalance").textContent="Players appear here after they open the game.";
   }else{
    coinSelect.disabled=false;
    const placeholder=document.createElement("option");
