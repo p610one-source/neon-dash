@@ -37,6 +37,9 @@ p{color:#aab8d3;font-size:13px}
 .admin-section{margin:18px 0;padding:12px;border:1px solid #34415d;border-radius:10px}
 .admin-muted{color:#aab8d3;font-size:12px;overflow-wrap:anywhere}
 .admin-danger{background:#ff477e;color:white}
+.admin-power{background:#8b5cf6;color:white}
+.admin-controls{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:10px 0}
+.admin-controls input{max-width:150px}
 
 </style>
 </head>
@@ -173,6 +176,21 @@ p{color:#aab8d3;font-size:13px}
 <button class="admin-danger" onclick="adminAdjustSelectedCoins(-1)">REMOVE COINS</button>
 </div>
 </div>
+</div>
+<div class="admin-section">
+<h3>⚡ DEVELOPER CHAOS MODE</h3>
+<p class="admin-muted">These test powers affect your game in this browser only.</p>
+<div class="admin-controls">
+<button class="admin-power" id="godModeButton" onclick="adminToggleGodMode()">GOD MODE: OFF</button>
+<button class="admin-power" onclick="adminUnlockAllSkins()">UNLOCK ALL SKINS</button>
+</div>
+<div class="admin-controls">
+<label for="adminStartLevel">Starting level:</label>
+<input id="adminStartLevel" type="number" min="1" max="100" value="1">
+<button class="admin-power" onclick="adminSetStartLevel()">SET NEXT RUN LEVEL</button>
+<button class="admin-power" onclick="adminPrepareBoss()">BOSS ON NEXT RUN</button>
+</div>
+<p id="adminPowerStatus" class="admin-muted">God Mode is off. Next run starts at level 1.</p>
 </div>
 <div class="admin-section">
 <h3>LEADERBOARD MANAGEMENT</h3>
@@ -728,6 +746,9 @@ async function requireAdmin(){
 }
 
 let adminWallets = [];
+let adminGodMode=false;
+let adminStartBoss=false;
+let adminStartLevel=1;
 
 function updateCoinSelection(){
  const select=$("coinPlayerSelect");
@@ -751,6 +772,32 @@ async function adminAdjustSelectedCoins(direction){
   return;
  }
  await adminAdjustCoins(userId,direction*amount);
+}
+
+function adminToggleGodMode(){
+ adminGodMode=!adminGodMode;
+ $("godModeButton").textContent="GOD MODE: "+(adminGodMode?"ON":"OFF");
+ $("adminPowerStatus").textContent=adminGodMode?"God Mode is ON in your browser.":"God Mode is OFF.";
+}
+function adminUnlockAllSkins(){
+ unlocked=["cyan","pink","gold"];
+ selected="gold";
+ save();
+ updateMenu();
+ $("adminPowerStatus").textContent="All skins unlocked. Golden selected.";
+}
+function adminSetStartLevel(){
+ const value=Number($("adminStartLevel").value);
+ if(!Number.isInteger(value)||value<1||value>100){
+  $("adminPowerStatus").textContent="Choose a whole level from 1 to 100.";
+  return;
+ }
+ adminStartLevel=value;
+ $("adminPowerStatus").textContent="Next run starts at level "+value+".";
+}
+function adminPrepareBoss(){
+ adminStartBoss=true;
+ $("adminPowerStatus").textContent="Boss battle queued for your next run.";
 }
 
 async function refreshAdminData(){
@@ -1204,7 +1251,7 @@ function updateBoss(){
   if(b.fromBoss){
    b.y+=b.speed;
 
-   if(hit(player,b)){
+   if(hit(player,b)&&!adminGodMode){
     bullets.splice(i,1);
 
     if(shield>0){
@@ -1321,7 +1368,7 @@ function gameLoop(){
  for(let i=obstacles.length-1;i>=0;i--){
   const o=obstacles[i];
 
-  if(hit(player,o)){
+  if(hit(player,o)&&!adminGodMode){
    if(shield>0){
     shield=0;
     obstacles.splice(i,1);
@@ -1384,18 +1431,19 @@ function startGame(){
  bullets=[];
  boss=null;
 
- score=0;
+ score=(adminStartLevel-1)*500;
  frame=0;
  shield=0;
- level=1;
+ level=adminStartLevel;
  missionProgress=0;
  lastBossLevel=0;
  bossShootCooldown=0;
  playerShootCooldown=0;
 
  running=true;
+ if(adminStartBoss){spawnBoss();adminStartBoss=false;}
 
- $("score").textContent=0;
+ $("score").textContent=score;
  $("menu").hidden=true;
  $("shop").hidden=true;
  $("over").hidden=true;
