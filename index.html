@@ -856,7 +856,7 @@ async function adminClearAnnouncement(){
  $("globalAnnouncementInput").value="";
  await adminPublishAnnouncement();
 }
-async function adminApplyGlobalSettings(){
+async async function adminApplyGlobalSettings(){
  try{
   await requireAdmin();
   const eventType=$("globalEventSelect").value;
@@ -869,7 +869,7 @@ async function adminApplyGlobalSettings(){
   $("globalControlStatus").textContent="Global settings applied to all players.";
  }catch(error){$("globalControlStatus").textContent="Settings failed: "+error.message;}
 }
-async function adminBlockSelectedPlayer(){
+async async function adminBlockSelectedPlayer(){
  const userId=$("accessPlayerSelect").value;
  if(!userId){$("blockControlStatus").textContent="Choose a player first.";return;}
  if(userId===currentUser?.id){$("blockControlStatus").textContent="You cannot block your own admin account.";return;}
@@ -881,7 +881,7 @@ async function adminBlockSelectedPlayer(){
   await refreshAdminData();
  }catch(error){$("blockControlStatus").textContent="Block failed: "+error.message;}
 }
-async function adminUnblockSelectedPlayer(){
+async async function adminUnblockSelectedPlayer(){
  const userId=$("accessPlayerSelect").value;
  if(!userId){$("blockControlStatus").textContent="Choose a player first.";return;}
  try{
