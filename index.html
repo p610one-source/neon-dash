@@ -757,8 +757,9 @@ async function refreshAdminData(){
   const coinList=$("adminCoinList");
   coinList.replaceChildren();
   const wallets=walletResult.data||[];
+  const playerNames=new Map((leaderboardResult.data||[]).map(entry=>[entry.user_id,entry.player_name]));
   if(!wallets.length){
-   coinList.textContent="No player wallets found yet.";
+   coinList.textContent="No player wallets found yet. Players appear here after opening the updated game.";
   }else{
    wallets.forEach(wallet=>{
     const row=document.createElement("div");
@@ -766,7 +767,8 @@ async function refreshAdminData(){
     const details=document.createElement("div");
     details.style.flex="1";
     const label=document.createElement("div");
-    label.textContent="Account: "+wallet.user_id.slice(0,8)+"…";
+    const knownName=playerNames.get(wallet.user_id);
+    label.textContent=(knownName||"Name not on leaderboard yet")+" · Account: "+wallet.user_id.slice(0,8)+"…";
     const balance=document.createElement("b");
     balance.textContent="Balance: "+wallet.coins+" coins";
     const amount=document.createElement("input");
@@ -774,7 +776,7 @@ async function refreshAdminData(){
     amount.min="1";
     amount.max="1000000";
     amount.value="100";
-    amount.setAttribute("aria-label","Coin amount");
+    amount.setAttribute("aria-label","Coin amount for "+(knownName||"player "+wallet.user_id.slice(0,8)));
     const give=document.createElement("button");
     give.textContent="GIVE";
     give.onclick=()=>adminAdjustCoins(wallet.user_id,amount.value);
