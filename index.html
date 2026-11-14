@@ -856,7 +856,7 @@ async function adminClearAnnouncement(){
  $("globalAnnouncementInput").value="";
  await adminPublishAnnouncement();
 }
-async async function adminApplyGlobalSettings(){
+async function adminApplyGlobalSettings(){
  try{
   await requireAdmin();
   const eventType=$("globalEventSelect").value;
@@ -1663,6 +1663,12 @@ async function endGame(){
 ===================================== */
 
 document.addEventListener("keydown",e=>{
+ const typing=e.target && (
+  e.target.isContentEditable ||
+  ["INPUT","TEXTAREA","SELECT"].includes(e.target.tagName)
+ );
+ if(typing)return;
+
  keys[e.key]=true;
 
  if(["ArrowLeft","ArrowRight"," "].includes(e.key)){
