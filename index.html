@@ -161,7 +161,18 @@ p{color:#aab8d3;font-size:13px}
 <div class="admin-section">
 <h3>🪙 COIN CONTROL</h3>
 <p class="admin-muted">Give or remove coins from player wallets. Changes are saved to Supabase.</p>
-<div id="adminCoinList">Loading wallets...</div>
+<div id="adminCoinList">
+<label for="coinPlayerSelect">Choose player:</label>
+<select id="coinPlayerSelect" onchange="updateCoinSelection()" style="padding:11px;border-radius:8px;border:1px solid #00eaff;background:#080b18;color:white;max-width:100%;width:100%;margin:10px 0">
+<option value="">Loading players...</option>
+</select>
+<p id="coinPlayerBalance">Select a player to see their balance.</p>
+<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+<input id="coinAmount" type="number" min="1" max="1000000" value="100" aria-label="Coin amount">
+<button onclick="adminAdjustSelectedCoins(1)">GIVE COINS</button>
+<button class="admin-danger" onclick="adminAdjustSelectedCoins(-1)">REMOVE COINS</button>
+</div>
+</div>
 </div>
 <div class="admin-section">
 <h3>LEADERBOARD MANAGEMENT</h3>
@@ -716,6 +727,32 @@ async function requireAdmin(){
  return true;
 }
 
+let adminWallets = [];
+
+function updateCoinSelection(){
+ const select=$("coinPlayerSelect");
+ const selectedWallet=adminWallets.find(wallet=>wallet.user_id===select.value);
+ if(!selectedWallet){
+  $("coinPlayerBalance").textContent="Select a player to see their balance.";
+  return;
+ }
+ $("coinPlayerBalance").textContent="Selected: "+(selectedWallet.player_name||"Unnamed player")+" · Balance: "+selectedWallet.coins+" coins";
+}
+
+async function adminAdjustSelectedCoins(direction){
+ const userId=$("coinPlayerSelect").value;
+ const amount=Number($("coinAmount").value);
+ if(!userId){
+  $("adminStatus").textContent="Choose a player first.";
+  return;
+ }
+ if(!Number.isSafeInteger(amount)||amount<1||amount>1000000){
+  $("adminStatus").textContent="Enter a whole number from 1 to 1,000,000.";
+  return;
+ }
+ await adminAdjustCoins(userId,direction*amount);
+}
+
 async function refreshAdminData(){
  const status=$("adminStatus");
  status.textContent="Loading admin data...";
@@ -754,40 +791,33 @@ async function refreshAdminData(){
    });
   }
 
-  const coinList=$("adminCoinList");
-  coinList.replaceChildren();
   const wallets=walletResult.data||[];
   const playerNames=new Map((leaderboardResult.data||[]).map(entry=>[entry.user_id,entry.player_name]));
-  if(!wallets.length){
-   coinList.textContent="No player wallets found yet. Players appear here after opening the updated game.";
+  adminWallets=wallets.map(wallet=>({...wallet,player_name:playerNames.get(wallet.user_id)||""}));
+  const coinSelect=$("coinPlayerSelect");
+  const previousSelection=coinSelect.value;
+  coinSelect.replaceChildren();
+  if(!adminWallets.length){
+   const option=document.createElement("option");
+   option.value="";
+   option.textContent="No player wallets found yet";
+   coinSelect.appendChild(option);
+   coinSelect.disabled=true;
+   $("coinPlayerBalance").textContent="Players appear here after opening the updated game.";
   }else{
-   wallets.forEach(wallet=>{
-    const row=document.createElement("div");
-    row.className="admin-row";
-    const details=document.createElement("div");
-    details.style.flex="1";
-    const label=document.createElement("div");
-    const knownName=playerNames.get(wallet.user_id);
-    label.textContent=(knownName||"Name not on leaderboard yet")+" · Account: "+wallet.user_id.slice(0,8)+"…";
-    const balance=document.createElement("b");
-    balance.textContent="Balance: "+wallet.coins+" coins";
-    const amount=document.createElement("input");
-    amount.type="number";
-    amount.min="1";
-    amount.max="1000000";
-    amount.value="100";
-    amount.setAttribute("aria-label","Coin amount for "+(knownName||"player "+wallet.user_id.slice(0,8)));
-    const give=document.createElement("button");
-    give.textContent="GIVE";
-    give.onclick=()=>adminAdjustCoins(wallet.user_id,amount.value);
-    const take=document.createElement("button");
-    take.textContent="REMOVE";
-    take.className="admin-danger";
-    take.onclick=()=>adminAdjustCoins(wallet.user_id,-Number(amount.value));
-    details.append(label,balance);
-    row.append(details,amount,give,take);
-    coinList.appendChild(row);
+   coinSelect.disabled=false;
+   const placeholder=document.createElement("option");
+   placeholder.value="";
+   placeholder.textContent="— Select a player —";
+   coinSelect.appendChild(placeholder);
+   adminWallets.forEach(wallet=>{
+    const option=document.createElement("option");
+    option.value=wallet.user_id;
+    option.textContent=(wallet.player_name||"Unnamed player")+" · "+wallet.user_id.slice(0,8)+"…";
+    coinSelect.appendChild(option);
    });
+   coinSelect.value=adminWallets.some(wallet=>wallet.user_id===previousSelection)?previousSelection:"";
+   updateCoinSelection();
   }
 
   const leaderboardList=$("adminLeaderboardList");
