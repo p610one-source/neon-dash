@@ -31,6 +31,13 @@ p{color:#aab8d3;font-size:13px}
 #leaderboardList{padding:0;list-style:none;text-align:left;max-width:420px;margin:15px auto}
 #leaderboardList li{padding:10px;border-bottom:1px solid #34415d;display:flex;justify-content:space-between}
 #bossText{color:#ff267e;font-weight:bold}
+#adminPanel{max-width:900px}
+.admin-row{display:flex;gap:8px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px;border-bottom:1px solid #34415d;text-align:left}
+.admin-row input{max-width:140px;width:100%}
+.admin-section{margin:18px 0;padding:12px;border:1px solid #34415d;border-radius:10px}
+.admin-muted{color:#aab8d3;font-size:12px;overflow-wrap:anywhere}
+.admin-danger{background:#ff477e;color:white}
+
 </style>
 </head>
 
@@ -95,6 +102,7 @@ p{color:#aab8d3;font-size:13px}
 <button onclick="openShop()">SHOP</button>
 <button onclick="claimDailyReward()">DAILY REWARD</button>
 <button onclick="openLeaderboard()">GLOBAL LEADERBOARD</button>
+<button onclick="openAdminLogin()">ADMIN LOGIN</button>
 
 <p id="message"></p>
 <p>V5: Boss battles, daily rewards and global leaderboard!</p>
@@ -130,6 +138,36 @@ p{color:#aab8d3;font-size:13px}
 </ol>
 
 <button onclick="showMenu()">BACK TO MENU</button>
+</div>
+
+<!-- ADMIN LOGIN AND DASHBOARD -->
+<div class="panel" id="adminPanel" hidden>
+<h2>🔐 NEON RUSH ADMIN</h2>
+<div id="adminLogin">
+<p>Sign in with the authorized administrator account.</p>
+<p><input id="adminEmail" type="email" value="p610one@gmail.com" readonly aria-label="Admin email"></p>
+<p><input id="adminPassword" type="password" placeholder="Admin password" autocomplete="current-password"></p>
+<button onclick="adminLogin()">SIGN IN</button>
+<button onclick="showMenu()">BACK TO MENU</button>
+<p id="adminLoginStatus"></p>
+</div>
+<div id="adminDashboard" hidden>
+<p>Signed in as <b>p610one@gmail.com</b></p>
+<div class="admin-section">
+<h3>PLAYER ACTIVITY</h3>
+<p id="adminActivitySummary">Loading...</p>
+<div id="adminActivityList"></div>
+</div>
+<div class="admin-section">
+<h3>LEADERBOARD MANAGEMENT</h3>
+<p class="admin-muted">Edit displayed names/scores or remove a leaderboard entry. Removing an entry does not delete the player's game account.</p>
+<div id="adminLeaderboardList"></div>
+</div>
+<button onclick="refreshAdminData()">REFRESH DATA</button>
+<button onclick="adminLogout()">SIGN OUT</button>
+<button onclick="showMenu()">BACK TO GAME</button>
+<p id="adminStatus"></p>
+</div>
 </div>
 
 <!-- GAME OVER -->
@@ -381,6 +419,7 @@ function showMenu(){
  $("over").hidden=true;
  $("hud").hidden=true;
  $("leaderboard").hidden=true;
+ $("adminPanel").hidden=true;
  $("mobileShoot").hidden=true;
 
  draw();
@@ -568,6 +607,184 @@ async function submitScore(){
   console.error(error);
   $("uploadStatus").textContent="Score submission failed: "+error.message;
  }
+}
+
+/* =====================================
+   ADMIN LOGIN AND CONTROLS
+===================================== */
+
+function openAdminLogin(){
+ running=false;
+ cancelAnimationFrame(animationId);
+ $("menu").hidden=true;
+ $("shop").hidden=true;
+ $("over").hidden=true;
+ $("leaderboard").hidden=true;
+ $("hud").hidden=true;
+ $("mobileShoot").hidden=true;
+ $("adminPanel").hidden=false;
+ $("adminLogin").hidden=false;
+ $("adminDashboard").hidden=true;
+ $("adminPassword").value="";
+ $("adminLoginStatus").textContent="";
+}
+
+async function adminLogin(){
+ const email=$("adminEmail").value.trim();
+ const password=$("adminPassword").value;
+ const status=$("adminLoginStatus");
+ if(!password){
+  status.textContent="Enter your password.";
+  return;
+ }
+ status.textContent="Signing in...";
+ try{
+  const {data,error}=await db.auth.signInWithPassword({email,password});
+  if(error)throw error;
+  currentUser=data.user;
+  const {data:isAdmin,error:checkError}=await db.rpc("is_current_user_admin");
+  if(checkError)throw checkError;
+  if(isAdmin!==true){
+   await db.auth.signOut();
+   currentUser=null;
+   throw new Error("This account is not authorized as an administrator.");
+  }
+  $("adminLogin").hidden=true;
+  $("adminDashboard").hidden=false;
+  $("adminStatus").textContent="Admin access verified.";
+  await refreshAdminData();
+ }catch(error){
+  console.error("Admin login:",error);
+  status.textContent="Login failed: "+error.message;
+ }
+}
+
+async function requireAdmin(){
+ const {data,error}=await db.rpc("is_current_user_admin");
+ if(error)throw error;
+ if(data!==true)throw new Error("Admin permission check failed. Please sign in again.");
+ return true;
+}
+
+async function refreshAdminData(){
+ const status=$("adminStatus");
+ status.textContent="Loading admin data...";
+ try{
+  await requireAdmin();
+  const [activityResult,leaderboardResult]=await Promise.all([
+   db.from("player_activity").select("user_id,first_seen,last_seen").order("last_seen",{ascending:false}).limit(100),
+   db.from("leaderboard").select("user_id,player_name,score,updated_at").order("score",{ascending:false}).limit(100)
+  ]);
+  if(activityResult.error)throw activityResult.error;
+  if(leaderboardResult.error)throw leaderboardResult.error;
+
+  const activities=activityResult.data||[];
+  const onlineCutoff=Date.now()-90000;
+  const onlineCount=activities.filter(p=>new Date(p.last_seen).getTime()>onlineCutoff).length;
+  $("adminActivitySummary").textContent=
+   "Showing "+activities.length+" recent accounts (up to 100). Online in last 90 seconds: "+onlineCount;
+  const activityList=$("adminActivityList");
+  activityList.replaceChildren();
+  if(!activities.length){
+   activityList.textContent="No player activity found.";
+  }else{
+   activities.forEach(p=>{
+    const row=document.createElement("div");
+    row.className="admin-row";
+    const label=document.createElement("span");
+    const online=new Date(p.last_seen).getTime()>onlineCutoff;
+    label.textContent=(online?"🟢 ONLINE":"⚪ OFFLINE")+" · "+p.user_id.slice(0,8)+"…";
+    const seen=document.createElement("span");
+    seen.className="admin-muted";
+    seen.textContent="Last seen: "+new Date(p.last_seen).toLocaleString();
+    row.append(label,seen);
+    activityList.appendChild(row);
+   });
+  }
+
+  const leaderboardList=$("adminLeaderboardList");
+  leaderboardList.replaceChildren();
+  const scores=leaderboardResult.data||[];
+  if(!scores.length){
+   leaderboardList.textContent="No leaderboard entries.";
+  }else{
+   scores.forEach(entry=>{
+    const row=document.createElement("div");
+    row.className="admin-row";
+    const details=document.createElement("div");
+    details.style.flex="1";
+    const name=document.createElement("input");
+    name.maxLength=16;
+    name.value=entry.player_name||"";
+    name.setAttribute("aria-label","Player name");
+    const scoreInput=document.createElement("input");
+    scoreInput.type="number";
+    scoreInput.min="0";
+    scoreInput.max="999999999";
+    scoreInput.value=entry.score;
+    scoreInput.setAttribute("aria-label","Player score");
+    const saveButton=document.createElement("button");
+    saveButton.textContent="SAVE";
+    saveButton.onclick=()=>adminUpdateScore(entry.user_id,name.value,scoreInput.value);
+    const deleteButton=document.createElement("button");
+    deleteButton.textContent="REMOVE";
+    deleteButton.className="admin-danger";
+    deleteButton.onclick=()=>adminDeleteScore(entry.user_id,entry.player_name);
+    const id=document.createElement("div");
+    id.className="admin-muted";
+    id.textContent="Account: "+entry.user_id.slice(0,8)+"…";
+    details.append(name,scoreInput,id);
+    row.append(details,saveButton,deleteButton);
+    leaderboardList.appendChild(row);
+   });
+  }
+  status.textContent="Admin data refreshed.";
+ }catch(error){
+  console.error("Admin refresh:",error);
+  status.textContent="Could not load admin data: "+error.message;
+ }
+}
+
+async function adminUpdateScore(userId,name,scoreValue){
+ try{
+  await requireAdmin();
+  const cleanName=name.trim();
+  const cleanScore=Number(scoreValue);
+  if(!cleanName||cleanName.length>16||!Number.isSafeInteger(cleanScore)||cleanScore<0){
+   throw new Error("Enter a name (1–16 characters) and a whole-number score of 0 or more.");
+  }
+  const {error}=await db.from("leaderboard")
+   .update({player_name:cleanName,score:cleanScore})
+   .eq("user_id",userId);
+  if(error)throw error;
+  $("adminStatus").textContent="Leaderboard entry updated.";
+  await refreshAdminData();
+ }catch(error){
+  $("adminStatus").textContent="Update failed: "+error.message;
+ }
+}
+
+async function adminDeleteScore(userId,playerName){
+ if(!confirm("Remove "+playerName+"'s leaderboard entry? Their game account will remain."))return;
+ try{
+  await requireAdmin();
+  const {error}=await db.from("leaderboard").delete().eq("user_id",userId);
+  if(error)throw error;
+  $("adminStatus").textContent="Leaderboard entry removed.";
+  await refreshAdminData();
+ }catch(error){
+  $("adminStatus").textContent="Removal failed: "+error.message;
+ }
+}
+
+async function adminLogout(){
+ await db.auth.signOut();
+ currentUser=null;
+ $("adminPanel").hidden=true;
+ $("adminLogin").hidden=false;
+ $("adminDashboard").hidden=true;
+ $("adminPassword").value="";
+ showMenu();
 }
 
 /* =====================================
