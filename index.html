@@ -110,6 +110,7 @@ p{color:#aab8d3;font-size:13px}
 <button onclick="openShop()">SHOP</button>
 <button onclick="claimDailyReward()">DAILY REWARD</button>
 <button onclick="openLeaderboard()">GLOBAL LEADERBOARD</button>
+<button onclick="openPlayerProfile()">PLAYER PROFILE</button>
 <button onclick="openAdminLogin()">ADMIN LOGIN</button>
 
 <p id="message"></p>
@@ -145,6 +146,32 @@ p{color:#aab8d3;font-size:13px}
 <li>Loading...</li>
 </ol>
 
+<button onclick="showMenu()">BACK TO MENU</button>
+</div>
+
+<!-- PLAYER PROFILE -->
+<div class="panel" id="profile" hidden>
+<h2>👤 PLAYER PROFILE</h2>
+<div style="width:90px;height:90px;margin:12px auto;border-radius:50%;border:3px solid #00eaff;display:grid;place-items:center;font-size:38px;background:#18243c">👾</div>
+<h3 id="profileName">Loading player...</h3>
+<p id="profileId" class="admin-muted"></p>
+<div class="stats">
+<span>🏆 Best score: <b id="profileBest">—</b></span>
+<span>🌍 Global rank: <b id="profileRank">—</b></span>
+<span>🪙 Coins: <b id="profileCoins">—</b></span>
+</div>
+<div class="stats">
+<span>⚡ Highest level: <b id="profileLevel">1</b></span>
+<span>👹 Bosses defeated: <b id="profileBosses">0</b></span>
+<span>🎮 Total runs: <b id="profileRuns">0</b></span>
+</div>
+<div class="admin-section">
+<h3>🎨 YOUR COLLECTION</h3>
+<p id="profileSkins">Loading skins...</p>
+<p id="profileSelectedSkin"></p>
+</div>
+<p id="profileStatus">Loading your profile...</p>
+<button onclick="loadPlayerProfile()">REFRESH PROFILE</button>
 <button onclick="showMenu()">BACK TO MENU</button>
 </div>
 
@@ -545,6 +572,7 @@ function showMenu(){
  $("hud").hidden=true;
  $("leaderboard").hidden=true;
  $("adminPanel").hidden=true;
+ $("profile").hidden=true;
  $("mobileShoot").hidden=true;
 
  draw();
@@ -629,6 +657,104 @@ function savePlayerName(){
  localStorage.setItem("nrPlayerName",JSON.stringify(playerName));
 
  $("leaderStatus").textContent="Player name saved!";
+}
+
+async function openPlayerProfile(){
+ running=false;
+ cancelAnimationFrame(animationId);
+ $("menu").hidden=true;
+ $("shop").hidden=true;
+ $("over").hidden=true;
+ $("leaderboard").hidden=true;
+ $("adminPanel").hidden=true;
+ $("profile").hidden=false;
+ $("hud").hidden=true;
+ $("mobileShoot").hidden=true;
+ await loadPlayerProfile();
+}
+
+async function loadPlayerProfile(){
+ const status=$("profileStatus");
+ status.textContent="Loading your profile...";
+ const connected=await connectAccount();
+ if(!connected||!currentUser){
+  status.textContent="Could not connect to your player account.";
+  return;
+ }
+ try{
+  const [statsResult,scoreResult,walletResult,rankResult]=await Promise.all([
+   db.from("player_game_stats").select("highest_level,bosses_defeated,total_runs").eq("user_id",currentUser.id).maybeSingle(),
+   db.from("leaderboard").select("player_name,score").eq("user_id",currentUser.id).maybeSingle(),
+   db.from("player_wallets").select("coins").eq("user_id",currentUser.id).maybeSingle(),
+   db.from("leaderboard").select("user_id",{count:"exact",head:true}).gt("score",best)
+  ]);
+  if(statsResult.error)throw statsResult.error;
+  if(scoreResult.error)throw scoreResult.error;
+  if(walletResult.error)throw walletResult.error;
+  if(rankResult.error)throw rankResult.error;
+  const stats=statsResult.data||{};
+  const ownScore=Number(scoreResult.data?.score||best||0);
+  let rank="—";
+  if(scoreResult.data){
+   const {count,error}=await db.from("leaderboard").select("user_id",{count:"exact",head:true}).gt("score",ownScore);
+   if(error)throw error;
+   rank=String((count||0)+1);
+  }else{
+   rank="Unranked";
+  }
+  $("profileName").textContent=scoreResult.data?.player_name||playerName;
+  $("profileId").textContent="Player ID: "+currentUser.id;
+  $("profileBest").textContent=ownScore;
+  $("profileRank").textContent=rank;
+  $("profileCoins").textContent=walletResult.data?Number(walletResult.data.coins):coins;
+  $("profileLevel").textContent=Number(stats.highest_level||1);
+  $("profileBosses").textContent=Number(stats.bosses_defeated||0);
+  $("profileRuns").textContent=Number(stats.total_runs||0);
+  $("profileSkins").textContent=(unlocked||["cyan"]).map(x=>x.toUpperCase()).join(" · ");
+  $("profileSelectedSkin").textContent="Currently selected: "+selected.toUpperCase();
+  status.textContent="Profile loaded successfully.";
+ }catch(error){
+  console.error("Player profile:",error);
+  status.textContent="Could not load profile: "+error.message;
+ }
+}
+
+async function recordProfileRun(){
+ try{
+  const connected=await connectAccount();
+  if(!connected||!currentUser)return;
+  const {data:existing,error:readError}=await db.from("player_game_stats")
+   .select("highest_level,bosses_defeated,total_runs")
+   .eq("user_id",currentUser.id).maybeSingle();
+  if(readError)throw readError;
+  const {error}=await db.from("player_game_stats").upsert({
+   user_id:currentUser.id,
+   highest_level:Math.max(Number(existing?.highest_level||1),level),
+   bosses_defeated:Number(existing?.bosses_defeated||0),
+   total_runs:Number(existing?.total_runs||0)+1,
+   updated_at:new Date().toISOString()
+  },{onConflict:"user_id"});
+  if(error)throw error;
+ }catch(error){console.error("Profile run save:",error);}
+}
+
+async function recordProfileBoss(){
+ try{
+  const connected=await connectAccount();
+  if(!connected||!currentUser)return;
+  const {data:existing,error:readError}=await db.from("player_game_stats")
+   .select("highest_level,bosses_defeated,total_runs")
+   .eq("user_id",currentUser.id).maybeSingle();
+  if(readError)throw readError;
+  const {error}=await db.from("player_game_stats").upsert({
+   user_id:currentUser.id,
+   highest_level:Math.max(Number(existing?.highest_level||1),level),
+   bosses_defeated:Number(existing?.bosses_defeated||0)+1,
+   total_runs:Number(existing?.total_runs||0),
+   updated_at:new Date().toISOString()
+  },{onConflict:"user_id"});
+  if(error)throw error;
+ }catch(error){console.error("Profile boss save:",error);}
 }
 
 function openLeaderboard(){
@@ -1455,6 +1581,7 @@ function updateBoss(){
 }
 
 function defeatBoss(){
+ recordProfileBoss();
  boss=null;
  bullets=[];
  const bossReward=(50+level*10)*(globalEvent==="double_coins"?2:1);
@@ -1636,6 +1763,7 @@ function startGame(){
 }
 
 async function endGame(){
+ recordProfileRun();
  running=false;
  cancelAnimationFrame(animationId);
 
