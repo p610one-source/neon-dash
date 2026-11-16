@@ -67,6 +67,64 @@ p{color:#aab8d3;font-size:13px}
 @keyframes introSpin{to{transform:rotate(360deg)}}@keyframes coreSpin{to{transform:rotate(360deg)}}@keyframes corePulse{50%{transform:scale(1.08);opacity:.55}}@keyframes scanMove{to{transform:translateY(8px)}}@keyframes starDrift{to{background-position:330px 270px}}@keyframes beamSweep{0%,100%{opacity:0;transform:translateY(-180px) rotate(-28deg)}50%{opacity:1;transform:translateY(180px) rotate(-28deg)}}@keyframes introRise{from{opacity:0;transform:translateY(35px) scale(.92)}to{opacity:1;transform:translateY(0) scale(1)}}@keyframes titlePower{to{filter:hue-rotate(25deg);transform:scale(1.025)}}@keyframes glitch{0%,92%,100%{clip-path:inset(0 0 0 0);transform:translate(4px,3px)}94%{clip-path:inset(35% 0 50% 0);transform:translate(-7px,1px)}96%{clip-path:inset(70% 0 10% 0);transform:translate(6px,-2px)}}@keyframes buttonThrob{50%{box-shadow:0 0 30px #00eaff,0 0 70px rgba(0,234,255,.7)}}@keyframes lineExpand{to{transform:scaleX(.65);opacity:.5}}@keyframes fadeBlink{50%{opacity:.45}}
 @media(prefers-reduced-motion:reduce){#introScreen *{animation-duration:.01ms!important;animation-iteration-count:1!important}}
 
+
+/* NEON RUSH LOBBY + IN-GAME VISUAL UPGRADE */
+body{min-height:100vh;overflow-x:hidden;background:radial-gradient(ellipse at 50% -15%,#17365a 0%,#080b18 48%,#03050d 100%);padding:18px 14px 42px}
+body:before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(circle at 12% 30%,rgba(0,234,255,.10),transparent 25%),radial-gradient(circle at 88% 65%,rgba(255,38,126,.09),transparent 28%);animation:lobbyGlow 8s ease-in-out infinite alternate}
+body>h1{font-size:clamp(24px,4vw,36px);margin:10px 0 4px;letter-spacing:9px;text-shadow:0 0 10px #00eaff,0 0 28px rgba(0,234,255,.65)}
+body>h1+p{letter-spacing:4px;text-transform:uppercase;color:#6f91b8;font-size:10px;margin:0 0 18px}
+button{transition:transform .18s ease,box-shadow .18s ease,filter .18s ease;letter-spacing:.7px}
+button:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 7px 24px rgba(0,234,255,.24)}
+button:active:not(:disabled){transform:translateY(1px) scale(.98)}
+.stats{gap:10px}
+.stats>span{padding:10px 15px;border:1px solid rgba(0,234,255,.22);border-radius:10px;background:linear-gradient(145deg,rgba(18,35,61,.94),rgba(7,14,30,.92));box-shadow:inset 0 0 18px rgba(0,234,255,.035),0 5px 18px rgba(0,0,0,.2)}
+.stats b{color:#fff;text-shadow:0 0 10px rgba(0,234,255,.45)}
+#playerStats{max-width:760px!important;border:1px solid rgba(0,234,255,.2)!important;border-radius:12px!important;background:rgba(10,20,39,.78)!important;color:#a9c5e5;backdrop-filter:blur(10px)}
+#menu{position:relative;isolation:isolate;overflow:hidden;max-width:920px;margin:22px auto;padding:clamp(22px,4vw,38px);border:1px solid rgba(0,234,255,.48);border-radius:22px;background:linear-gradient(145deg,rgba(16,31,57,.97),rgba(7,12,28,.97) 62%,rgba(28,12,40,.96));box-shadow:0 0 24px rgba(0,234,255,.13),0 22px 70px rgba(0,0,0,.45),inset 0 0 45px rgba(0,234,255,.045);animation:menuAppear .8s cubic-bezier(.2,.8,.2,1) both}
+#menu:before{content:"";position:absolute;z-index:-1;width:360px;height:360px;right:-130px;top:-190px;border:1px solid rgba(0,234,255,.3);border-radius:50%;box-shadow:0 0 0 22px rgba(0,234,255,.025),0 0 0 48px rgba(0,234,255,.02),0 0 75px rgba(0,234,255,.13);animation:menuOrbit 18s linear infinite}
+#menu:after{content:"";position:absolute;z-index:-1;left:-120px;bottom:-220px;width:300px;height:300px;border-radius:50%;background:rgba(255,38,126,.09);filter:blur(55px)}
+#menu h2{font-size:clamp(34px,6vw,54px);letter-spacing:8px;margin:2px 0 4px;color:#fff;text-shadow:0 0 10px #fff,0 0 22px #00eaff,0 0 48px rgba(0,234,255,.75)}
+#menu>p:first-of-type{letter-spacing:5px;color:#8edfeb;font-size:11px;margin:8px 0 28px}
+#menu h3{font-size:13px;letter-spacing:4px;color:#9cb5d5;text-transform:uppercase;margin:24px 0 14px}
+.skins{gap:14px;margin:0 auto;max-width:700px}
+.skin{position:relative;width:clamp(145px,24vw,190px);padding:18px 12px 16px;border:1px solid rgba(118,151,190,.3);border-radius:15px;background:linear-gradient(155deg,rgba(27,48,76,.95),rgba(10,19,37,.98));box-shadow:0 10px 25px rgba(0,0,0,.22);transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease;animation:skinFloat 5s ease-in-out infinite}
+.skin:nth-child(2){animation-delay:.45s}.skin:nth-child(3){animation-delay:.9s}
+.skin:hover{transform:translateY(-7px) scale(1.025);border-color:#00eaff;box-shadow:0 0 22px rgba(0,234,255,.18)}
+.skin b{display:block;letter-spacing:3px;font-size:13px;color:#f0f7ff}
+.skin p{margin:6px 0 10px;color:#8ea9ca;font-size:11px;letter-spacing:2px}
+.preview{width:54px;height:54px;border-radius:14px;transform:rotate(45deg);margin:10px auto 18px;box-shadow:0 0 16px currentColor,0 0 35px currentColor;animation:previewPulse 2s ease-in-out infinite}
+.skin button{font-size:10px;padding:9px 15px;min-width:105px}
+#selected{display:inline-block;margin:20px auto 14px;padding:9px 18px;border-radius:30px;border:1px solid rgba(0,234,255,.28);background:rgba(0,234,255,.07);color:#b8f8ff;letter-spacing:2px}
+#menu>button{min-width:145px;margin:6px 4px;padding:13px 17px;border:1px solid rgba(0,234,255,.35);border-radius:9px;background:linear-gradient(135deg,#123d58,#0b2038);color:#dffcff;box-shadow:0 5px 16px rgba(0,0,0,.2);font-size:11px}
+#menu>button:first-of-type{display:block;width:min(100%,310px);margin:8px auto 14px;padding:17px 22px;border:1px solid #a6faff;background:linear-gradient(100deg,#00bfe8,#a4faff,#00bfe8);background-size:200% auto;color:#04131e;font-size:14px;font-weight:900;letter-spacing:3px;box-shadow:0 0 18px rgba(0,234,255,.55),0 0 42px rgba(0,234,255,.2);animation:primaryShine 3s linear infinite}
+#menu>button:nth-of-type(2){border-color:rgba(255,215,0,.5);color:#ffe9a0}
+#menu>button:nth-of-type(3){border-color:rgba(255,38,126,.4);color:#ffb4d0}
+#menu>button:nth-of-type(4),#menu>button:nth-of-type(5),#menu>button:nth-of-type(6){background:rgba(14,25,46,.9)}
+#message{color:#a4faff;font-weight:bold;text-shadow:0 0 10px rgba(0,234,255,.4)}
+/* Keep the lobby clean; the arena appears only when a run starts. */
+canvas{display:none;width:min(94vw,900px);aspect-ratio:3/2;height:auto;margin:14px auto 20px;border:1px solid rgba(0,234,255,.75);border-radius:16px;background:#080f20;box-shadow:0 0 20px rgba(0,234,255,.24),0 0 65px rgba(0,234,255,.08);touch-action:none}
+body.playing canvas,body.gameover canvas{display:block}
+body.playing,body.gameover{background:radial-gradient(ellipse at 50% 0%,#152d4a 0%,#070b18 55%,#02040a 100%)}
+body.playing>h1,body.gameover>h1{font-size:22px;letter-spacing:7px;margin:4px 0 12px}
+body.playing>h1+p,body.gameover>h1+p{display:none}
+body.playing #playerStats,body.gameover #playerStats{display:none}
+body.playing .stats,body.gameover .stats{max-width:900px;margin:10px auto}
+#hud{max-width:900px;padding:12px 16px;margin:14px auto 8px;border:1px solid rgba(0,234,255,.4);border-radius:12px;background:linear-gradient(100deg,rgba(9,24,43,.96),rgba(20,17,45,.96));box-shadow:0 0 22px rgba(0,234,255,.1);align-items:center;text-transform:uppercase;letter-spacing:1.5px}
+#levelLabel{color:#00eaff;font-weight:900;text-shadow:0 0 10px #00eaff}
+#missionText{flex:1;color:#b8cce9;font-size:12px}
+#bossText{color:#ff6a9d;text-shadow:0 0 12px #ff267e}
+#mobileShoot{position:fixed;right:22px;bottom:22px;z-index:20;border:2px solid #ff8ab4;border-radius:50%;width:88px;height:88px;background:radial-gradient(circle,#ff4388,#8b124d);color:white;box-shadow:0 0 20px #ff267e,0 0 55px rgba(255,38,126,.45);font-weight:900}
+body.playing>p{max-width:900px;margin:8px auto;color:#6f91b8;font-size:11px;letter-spacing:1px}
+body.playing .stats>span{min-width:105px}
+#over{max-width:560px;border-color:rgba(255,38,126,.6);background:linear-gradient(145deg,#25132d,#0c1428);box-shadow:0 0 32px rgba(255,38,126,.16)}
+#over h2{letter-spacing:6px;text-shadow:0 0 18px #ff267e}
+#over h3{font-size:28px;color:#fff}
+#over button:first-of-type{background:linear-gradient(100deg,#00bfe8,#a4faff);color:#04131e}
+.panel:not(#menu){border-color:rgba(0,234,255,.32);border-radius:17px;background:linear-gradient(145deg,rgba(16,31,57,.97),rgba(7,12,28,.98));box-shadow:0 14px 45px rgba(0,0,0,.3)}
+@keyframes lobbyGlow{to{opacity:.55;transform:scale(1.06)}}@keyframes menuAppear{from{opacity:0;transform:translateY(22px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}@keyframes menuOrbit{to{transform:rotate(360deg)}}@keyframes skinFloat{0%,100%{translate:0 0}50%{translate:0 -5px}}@keyframes previewPulse{50%{filter:brightness(1.35);box-shadow:0 0 25px currentColor,0 0 48px currentColor}}@keyframes primaryShine{to{background-position:200% center}}
+@media(max-width:560px){body{padding:12px 8px 30px}#menu{padding:22px 12px}.skin{width:calc(33.33% - 10px);min-width:95px;padding:12px 6px}.skin button{min-width:0;padding:8px 9px}.preview{width:40px;height:40px}#menu>button{min-width:calc(50% - 16px);font-size:10px;padding:11px 8px}#menu>button:first-of-type{width:90%}#hud{gap:8px;padding:10px;font-size:11px}#missionText{min-width:100%;order:3}#mobileShoot{width:72px;height:72px;right:14px;bottom:14px}}
+@media(prefers-reduced-motion:reduce){#menu *,body:before{animation-duration:.01ms!important;animation-iteration-count:1!important}}
+
 </style>
 </head>
 
@@ -601,6 +659,7 @@ function selectSkin(name){
 }
 
 function showMenu(){
+ document.body.classList.remove("playing","gameover");
  running=false;
  cancelAnimationFrame(animationId);
 
@@ -1785,6 +1844,8 @@ function startGame(){
  playerShootCooldown=0;
 
  running=true;
+ document.body.classList.add("playing");
+ document.body.classList.remove("gameover");
  if(adminStartBoss){spawnBoss();adminStartBoss=false;}
 
  $("score").textContent=score;
@@ -1802,6 +1863,8 @@ function startGame(){
 
 async function endGame(){
  recordProfileRun();
+ document.body.classList.remove("playing");
+ document.body.classList.add("gameover");
  running=false;
  cancelAnimationFrame(animationId);
 
