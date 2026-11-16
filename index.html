@@ -44,10 +44,48 @@ p{color:#aab8d3;font-size:13px}
 .admin-section textarea,.admin-section select{padding:10px;border-radius:8px;border:1px solid #00eaff;background:#080b18;color:white;max-width:100%;width:100%;margin:6px 0}
 #blockedNotice{max-width:720px;margin:12px auto;padding:18px;border:1px solid #ff477e;border-radius:12px;color:#ff9bb8;background:#251020}
 
+
+/* CINEMATIC INTRO */
+#introScreen{position:fixed;inset:0;z-index:9999;overflow:hidden;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 48%,#172b52 0%,#080b18 48%,#02030a 100%);isolation:isolate}
+#introScreen[hidden]{display:none!important}
+#introScreen:before{content:"";position:absolute;inset:-50%;background:repeating-conic-gradient(from 0deg,transparent 0deg 8deg,rgba(0,234,255,.12) 8.2deg 8.35deg,transparent 8.6deg 16deg);animation:introSpin 55s linear infinite;mask-image:radial-gradient(circle,black 0%,transparent 68%)}
+#introScreen:after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(0,234,255,.035) 4px);pointer-events:none;animation:scanMove 8s linear infinite}
+.intro-stars{position:absolute;inset:0;background-image:radial-gradient(2px 2px at 12% 22%,#fff 50%,transparent 100%),radial-gradient(2px 2px at 78% 18%,#00eaff 50%,transparent 100%),radial-gradient(1px 1px at 35% 72%,#fff 50%,transparent 100%),radial-gradient(2px 2px at 88% 77%,#ff267e 50%,transparent 100%),radial-gradient(1px 1px at 58% 40%,#fff 50%,transparent 100%),radial-gradient(2px 2px at 22% 85%,#00eaff 50%,transparent 100%);background-size:330px 270px;animation:starDrift 18s linear infinite;opacity:.8}
+.intro-core{position:absolute;width:min(70vw,520px);aspect-ratio:1;border:2px solid rgba(0,234,255,.65);border-radius:50%;box-shadow:0 0 24px #00eaff, inset 0 0 35px rgba(0,234,255,.25);animation:corePulse 2.4s ease-in-out infinite,coreSpin 14s linear infinite}
+.intro-core:before,.intro-core:after{content:"";position:absolute;inset:9%;border:2px dashed rgba(255,38,126,.75);border-radius:50%;box-shadow:0 0 25px #ff267e;animation:coreSpin 9s linear infinite reverse}
+.intro-core:after{inset:20%;border-color:rgba(255,215,0,.7);animation-duration:6s}
+.intro-beam{position:absolute;width:160%;height:2px;background:linear-gradient(90deg,transparent,#00eaff,white,#ff267e,transparent);box-shadow:0 0 18px #00eaff;transform:rotate(-28deg);animation:beamSweep 3.2s ease-in-out infinite}
+.intro-content{position:relative;z-index:2;padding:28px;width:min(92vw,760px);animation:introRise 1.2s cubic-bezier(.2,.8,.2,1) both}
+.intro-kicker{font-size:12px;letter-spacing:8px;color:#9af7ff;text-shadow:0 0 12px #00eaff;animation:fadeBlink 1.8s infinite}
+.intro-title{position:relative;margin:14px 0 4px;font-size:clamp(42px,10vw,88px);font-weight:1000;letter-spacing:clamp(5px,1.5vw,15px);line-height:1;color:#fff;text-shadow:0 0 8px #fff,0 0 20px #00eaff,0 0 48px #00eaff,0 0 90px #0077ff;animation:titlePower 2s ease-in-out infinite alternate}
+.intro-title:after{content:"NEON RUSH";position:absolute;inset:0;color:#ff267e;opacity:.55;z-index:-1;transform:translate(4px,3px);filter:blur(1px);animation:glitch 2.8s steps(2,end) infinite}
+.intro-sub{letter-spacing:4px;color:#c9d8f5;font-size:clamp(11px,2vw,15px);margin:18px 0 30px}
+.intro-enter{font-size:15px;letter-spacing:3px;padding:16px 34px;border:1px solid #9af7ff;border-radius:4px;color:#03121d;background:linear-gradient(100deg,#00eaff,#b8fbff,#00eaff);box-shadow:0 0 18px #00eaff,0 0 45px rgba(0,234,255,.5);animation:buttonThrob 1.5s ease-in-out infinite}
+.intro-enter:hover{transform:scale(1.06);filter:brightness(1.2)}
+.intro-skip{display:block;margin:16px auto 0;background:transparent;color:#aab8d3;border:1px solid #43516e;font-size:11px;letter-spacing:2px;padding:8px 15px}
+.intro-line{width:min(65vw,360px);height:2px;margin:22px auto;background:linear-gradient(90deg,transparent,#00eaff,#ff267e,transparent);box-shadow:0 0 12px #00eaff;animation:lineExpand 2s ease-in-out infinite alternate}
+@keyframes introSpin{to{transform:rotate(360deg)}}@keyframes coreSpin{to{transform:rotate(360deg)}}@keyframes corePulse{50%{transform:scale(1.08);opacity:.55}}@keyframes scanMove{to{transform:translateY(8px)}}@keyframes starDrift{to{background-position:330px 270px}}@keyframes beamSweep{0%,100%{opacity:0;transform:translateY(-180px) rotate(-28deg)}50%{opacity:1;transform:translateY(180px) rotate(-28deg)}}@keyframes introRise{from{opacity:0;transform:translateY(35px) scale(.92)}to{opacity:1;transform:translateY(0) scale(1)}}@keyframes titlePower{to{filter:hue-rotate(25deg);transform:scale(1.025)}}@keyframes glitch{0%,92%,100%{clip-path:inset(0 0 0 0);transform:translate(4px,3px)}94%{clip-path:inset(35% 0 50% 0);transform:translate(-7px,1px)}96%{clip-path:inset(70% 0 10% 0);transform:translate(6px,-2px)}}@keyframes buttonThrob{50%{box-shadow:0 0 30px #00eaff,0 0 70px rgba(0,234,255,.7)}}@keyframes lineExpand{to{transform:scaleX(.65);opacity:.5}}@keyframes fadeBlink{50%{opacity:.45}}
+@media(prefers-reduced-motion:reduce){#introScreen *{animation-duration:.01ms!important;animation-iteration-count:1!important}}
+
 </style>
 </head>
 
 <body>
+
+<div id="introScreen" aria-label="Neon Rush intro">
+  <div class="intro-stars"></div>
+  <div class="intro-core"></div>
+  <div class="intro-beam"></div>
+  <div class="intro-content">
+    <div class="intro-kicker">WELCOME TO THE ARENA</div>
+    <div class="intro-title">NEON RUSH</div>
+    <div class="intro-line"></div>
+    <div class="intro-sub">DODGE • SURVIVE • DOMINATE</div>
+    <button class="intro-enter" onclick="enterGame()">ENTER THE NEON WORLD</button>
+    <button class="intro-skip" onclick="enterGame()">SKIP INTRO</button>
+  </div>
+</div>
+
 
 <h1>NEON RUSH</h1>
 <p>V6 — ULTIMATE ADMIN UPDATE</p>
@@ -1842,6 +1880,27 @@ $("mobileShoot").addEventListener("pointerup",()=>{
 
 $("mobileShoot").addEventListener("pointerleave",()=>{
  keys[" "]=false;
+});
+
+function enterGame(){
+ const intro=$("introScreen");
+ if(!intro || intro.hidden)return;
+ intro.style.transition="opacity .65s ease, transform .65s ease";
+ intro.style.opacity="0";
+ intro.style.transform="scale(1.08)";
+ setTimeout(()=>{
+  intro.hidden=true;
+  intro.style.opacity="";
+  intro.style.transform="";
+  intro.style.transition="";
+ },650);
+}
+
+document.addEventListener("keydown",e=>{
+ if(e.key==="Enter" && $("introScreen") && !$("introScreen").hidden){
+  e.preventDefault();
+  enterGame();
+ }
 });
 
 /* =====================================
